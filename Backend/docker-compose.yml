@@ -6,12 +6,24 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     env_file:
       - .env
+    environment:
+      RUN_MIGRATIONS: "true"
+      MEILISEARCH_URL: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-local-development-master-key}
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     depends_on:
       redis:
+        condition: service_healthy
+      meilisearch:
         condition: service_healthy
     restart: unless-stopped
 
@@ -22,10 +34,16 @@ services:
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info
     env_file:
       - .env
+    environment:
+      RUN_MIGRATIONS: "false"
+      MEILISEARCH_URL: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-local-development-master-key}
     volumes:
       - .:/app
     depends_on:
       redis:
+        condition: service_healthy
+      meilisearch:
         condition: service_healthy
     restart: unless-stopped
 
@@ -36,10 +54,16 @@ services:
     command: celery -A app.workers.celery_app.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
     env_file:
       - .env
+    environment:
+      RUN_MIGRATIONS: "false"
+      MEILISEARCH_URL: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-local-development-master-key}
     volumes:
       - .:/app
     depends_on:
       redis:
+        condition: service_healthy
+      meilisearch:
         condition: service_healthy
     restart: unless-stopped
 
@@ -55,5 +79,22 @@ services:
       retries: 5
     restart: unless-stopped
 
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-local-development-master-key}
+    volumes:
+      - meilisearch_data:/meili_data
+    ports:
+      - "7700:7700"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   redis_data:
+  meilisearch_data:

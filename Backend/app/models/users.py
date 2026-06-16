@@ -11,13 +11,13 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class UserRoleName(str, enum.Enum):
-    admin = "admin"
-    manager = "manager"
+    super_admin = "super_admin"
+    sales_manager = "sales_manager"
     sales_rep = "sales_rep"
-    marketing = "marketing"
+    marketing_manager = "marketing_manager"
+    marketing_rep = "marketing_rep"
     customer_success = "customer_success"
-    support = "support"
-    viewer = "viewer"
+    read_only = "read_only"
 
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):

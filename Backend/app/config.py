@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     environment: Environment = Field(default="development", alias="ENVIRONMENT")
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_key: str = Field(alias="SUPABASE_KEY")
+    resend_api_key: str | None = Field(default=None, alias="RESEND_API_KEY")
+    resend_from_email: str = Field(default="crm@example.com", alias="RESEND_FROM_EMAIL")
+    r2_endpoint_url: str | None = Field(default=None, alias="R2_ENDPOINT_URL")
+    r2_access_key_id: str | None = Field(default=None, alias="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: str | None = Field(default=None, alias="R2_SECRET_ACCESS_KEY")
+    r2_bucket_name: str | None = Field(default=None, alias="R2_BUCKET_NAME")
+    r2_region_name: str = Field(default="auto", alias="R2_REGION_NAME")
+    meilisearch_url: str | None = Field(default=None, alias="MEILISEARCH_URL")
+    meilisearch_api_key: str | None = Field(default=None, alias="MEILISEARCH_API_KEY")
+    webhook_secret: str = Field(default="change-me-webhook-secret-at-least-32-chars", alias="WEBHOOK_SECRET")
 
     model_config = SettingsConfigDict(
         env_file=".env",

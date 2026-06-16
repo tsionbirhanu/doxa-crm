@@ -5,8 +5,13 @@ asyncpg==0.31.0
 alembic==1.18.4
 pydantic-settings==2.14.1
 python-jose[cryptography]==3.5.0
+python-multipart==0.0.21
+boto3==1.42.12
+slowapi==0.1.9
+reportlab==4.4.5
 celery==5.6.3
 redis==8.0.0
 httpx==0.28.1
 pytest==9.0.3
 pytest-asyncio==1.4.0
+pytest-cov==7.0.0

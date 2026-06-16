@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from app.models.base import Base
 from app.models.activities import Activity, ActivityType, Task, TaskPriority, TaskStatus
+from app.models.audit import AuditLog
 from app.models.campaigns import (
     Campaign,
     CampaignEnrollment,
     CampaignEnrollmentStatus,
+    CampaignMetric,
+    CampaignMetricEventType,
     CampaignSequenceChannel,
     CampaignSequenceStep,
     CampaignStatus,
@@ -20,21 +23,26 @@ from app.models.contacts import (
     CustomFieldEntityType,
     CustomFieldType,
 )
-from app.models.deals import Deal, DealCollaborator, DealStatus, Pipeline, PipelineStage
+from app.models.deals import Deal, DealCollaborator, DealStageHistory, DealStatus, Pipeline, PipelineStage
 from app.models.leads import Lead, LeadSource, LeadStatus
 from app.models.projects import Milestone, Project, ProjectDocument, ProjectHealth
-from app.models.reports import ReportSnapshot
+from app.models.reports import ReportSnapshot, SalesQuota
+from app.models.task_logs import TaskLog
 from app.models.users import Role, User, UserRole, UserRoleName
+from app.models.webhooks import WebhookLog, WebhookSubscription
 
 __all__ = [
     "Account",
     "AccountTier",
     "Activity",
     "ActivityType",
+    "AuditLog",
     "Base",
     "Campaign",
     "CampaignEnrollment",
     "CampaignEnrollmentStatus",
+    "CampaignMetric",
+    "CampaignMetricEventType",
     "CampaignSequenceChannel",
     "CampaignSequenceStep",
     "CampaignStatus",
@@ -46,6 +54,7 @@ __all__ = [
     "CustomFieldType",
     "Deal",
     "DealCollaborator",
+    "DealStageHistory",
     "DealStatus",
     "Lead",
     "LeadSource",
@@ -58,10 +67,14 @@ __all__ = [
     "ProjectHealth",
     "ReportSnapshot",
     "Role",
+    "SalesQuota",
     "Task",
+    "TaskLog",
     "TaskPriority",
     "TaskStatus",
     "User",
     "UserRole",
     "UserRoleName",
+    "WebhookLog",
+    "WebhookSubscription",
 ]

@@ -46,6 +46,12 @@ class Account(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=dict,
         server_default=text("'{}'::jsonb"),
     )
+    custom_fields: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
     tier: Mapped[AccountTier] = mapped_column(
         SQLEnum(AccountTier, name="account_tier"),
         nullable=False,
@@ -55,6 +61,12 @@ class Account(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("users.id"),
         nullable=False,
         index=True,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
     )
 
     owner = relationship("User")
@@ -91,6 +103,12 @@ class Contact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         default=dict,
         server_default=text("'{}'::jsonb"),
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
     )
 
     account = relationship("Account")

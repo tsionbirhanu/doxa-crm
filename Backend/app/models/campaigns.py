@@ -39,6 +39,14 @@ class CampaignSequenceChannel(str, enum.Enum):
     social = "social"
 
 
+class CampaignMetricEventType(str, enum.Enum):
+    sent = "sent"
+    opened = "opened"
+    clicked = "clicked"
+    replied = "replied"
+    converted = "converted"
+
+
 class Campaign(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "campaigns"
 
@@ -80,6 +88,11 @@ class Campaign(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="campaign",
         cascade="all, delete-orphan",
         order_by="CampaignSequenceStep.step_index",
+    )
+    metrics: Mapped[list[CampaignMetric]] = relationship(
+        "CampaignMetric",
+        back_populates="campaign",
+        cascade="all, delete-orphan",
     )
 
 
@@ -156,5 +169,37 @@ class CampaignSequenceStep(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=0,
         server_default=text("0"),
     )
+    variant: Mapped[str | None] = mapped_column(String(1), nullable=True)
 
     campaign: Mapped[Campaign] = relationship("Campaign", back_populates="sequence_steps")
+
+
+class CampaignMetric(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "campaign_metrics"
+
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    step_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("campaign_sequence_steps.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    event_type: Mapped[CampaignMetricEventType] = mapped_column(
+        SQLEnum(CampaignMetricEventType, name="campaign_metric_event_type"),
+        nullable=False,
+    )
+
+    campaign: Mapped[Campaign] = relationship("Campaign", back_populates="metrics")
+    contact = relationship("Contact")
+    step = relationship("CampaignSequenceStep")

@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum as SQLEnum, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,10 +27,10 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    deal_id: Mapped[uuid.UUID] = mapped_column(
+    deal_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("deals.id"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     status: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -47,6 +47,12 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         index=True,
     )
     portal_token: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
 
     account = relationship("Account")
     deal = relationship("Deal")
@@ -92,6 +98,10 @@ class ProjectDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     file_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default="")
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    mime_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    storage_key: Mapped[str] = mapped_column(String(1000), nullable=False, default="", server_default="")
     uploaded_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),

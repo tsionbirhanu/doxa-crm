@@ -1,0 +1,18 @@
+{
+  "stage_rules": [
+    {
+      "stage_names": ["Proposal Sent"],
+      "title": "Send proposal follow-up",
+      "description": "Follow up after the proposal was sent.",
+      "priority": "high",
+      "due_in_days": 2
+    },
+    {
+      "stage_names": ["Negotiation"],
+      "title": "Prepare negotiation next steps",
+      "description": "Confirm decision makers, blockers, and close plan.",
+      "priority": "medium",
+      "due_in_days": 3
+    }
+  ]
+}
