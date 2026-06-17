@@ -1,0 +1,116 @@
+"use client";
+
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { authClient } from "@/lib/auth-client";
+import { refreshCurrentUser, refreshFastApiToken } from "@/lib/auth-token";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [callbackUrl, setCallbackUrl] = React.useState("/dashboard");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    const nextCallbackUrl = new URLSearchParams(window.location.search).get("callbackUrl");
+    setCallbackUrl(nextCallbackUrl ?? "/dashboard");
+  }, []);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await authClient.signIn.email({
+        email,
+        password,
+        callbackURL: callbackUrl,
+        rememberMe: true,
+      });
+
+      if (error) {
+        setErrorMessage(error.message || "Email or password is not correct.");
+        return;
+      }
+
+      await refreshFastApiToken();
+      await refreshCurrentUser();
+      router.push(callbackUrl);
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Sign in failed.";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#0f2a44] px-4 py-10">
+      <Card className="w-full max-w-md border-white/10 bg-white shadow-2xl">
+        <CardHeader className="gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#0f2a44] text-white">
+              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-[#0f2a44]">Doxa CRM</p>
+              <p className="text-xs font-medium uppercase tracking-normal text-slate-500">Secure workspace</p>
+            </div>
+          </div>
+          <div>
+            <CardTitle className="text-2xl text-slate-950">Sign in</CardTitle>
+            <CardDescription>Use your CRM account to continue.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-4" onSubmit={onSubmit}>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                autoComplete="email"
+                id="email"
+                inputMode="email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@company.com"
+                required
+                type="email"
+                value={email}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                autoComplete="current-password"
+                id="password"
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                required
+                type="password"
+                value={password}
+              />
+            </div>
+            {errorMessage ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                {errorMessage}
+              </div>
+            ) : null}
+            <Button className="mt-2 w-full" disabled={isSubmitting} type="submit">
+              {isSubmitting ? "Signing in..." : "Sign in"}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
