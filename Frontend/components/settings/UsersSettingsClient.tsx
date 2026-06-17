@@ -28,7 +28,13 @@ export function UsersSettingsClient() {
   const queryClient = useQueryClient();
   const session = authClient.useSession();
   const storedUser = useAuthStore((state) => state.user);
-  const currentUserId = String(session.data?.user?.id ?? storedUser?.id ?? "");
+  const fallbackCurrentUserId = String(session.data?.user?.id ?? storedUser?.id ?? "");
+  const meQuery = useQuery({
+    queryFn: () => api.get<User>("/users/me"),
+    queryKey: ["users", "me"],
+    retry: false,
+  });
+  const currentUserId = meQuery.data?.id ?? fallbackCurrentUserId;
   const [formOpen, setFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userToToggle, setUserToToggle] = useState<User | null>(null);

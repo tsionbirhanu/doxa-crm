@@ -19,8 +19,8 @@ const allowedRoles: CrmRole[] = ["super_admin", "sales_manager"];
 const settingsLinks = [
   { href: "/settings/users", icon: Users, label: "Users" },
   { href: "/settings/pipeline", icon: SlidersHorizontal, label: "Pipeline" },
-  { disabled: true, href: "/settings/integrations", icon: Plug, label: "Integrations" },
-  { disabled: true, href: "/settings/billing", icon: CreditCard, label: "Billing" },
+  { href: "/settings/integrations", icon: Plug, label: "Integrations" },
+  { href: "/settings/billing", icon: CreditCard, label: "Billing" },
 ];
 
 export function SettingsLayoutClient({ children }: SettingsLayoutClientProps) {
@@ -58,15 +58,6 @@ export function SettingsLayoutClient({ children }: SettingsLayoutClientProps) {
           {settingsLinks.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-            if (item.disabled) {
-              return (
-                <span className="flex h-10 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-400" key={item.href}>
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                  {item.label}
-                </span>
-              );
-            }
 
             return (
               <Link

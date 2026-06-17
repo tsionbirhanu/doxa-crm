@@ -28,6 +28,10 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function isUuid(value: string | undefined): value is string {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+}
+
 function contactName(contact: Contact): string {
   return `${contact.first_name} ${contact.last_name}`;
 }
@@ -56,9 +60,15 @@ export function TasksPageClient() {
   const session = authClient.useSession();
   const storedUser = useAuthStore((state) => state.user);
   const sessionUser = session.data?.user;
-  const currentUserId = stringOrUndefined(sessionUser?.id) ?? storedUser?.id;
   const role = normalizeRole(sessionUser?.role ?? storedUser?.role);
   const canSeeAll = role === "super_admin" || role === "sales_manager";
+  const fallbackSessionId = stringOrUndefined(sessionUser?.id) ?? storedUser?.id;
+  const meQuery = useQuery({
+    queryFn: () => api.get<User>("/users/me"),
+    queryKey: ["users", "me"],
+    retry: false,
+  });
+  const currentUserId = meQuery.data?.id ?? (isUuid(fallbackSessionId) ? fallbackSessionId : undefined);
   const [tab, setTab] = useState<TaskTab>("mine");
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
@@ -220,8 +230,8 @@ export function TasksPageClient() {
         </div>
       </section>
 
-      {!currentUserId && tab === "mine" ? (
-        <div className="rounded-xl border border-amber-100 bg-white p-4 text-sm text-amber-800 shadow-sm">Could not identify the current user session yet.</div>
+      {!currentUserId && tab === "mine" && !meQuery.isLoading ? (
+        <div className="rounded-xl border border-amber-100 bg-white p-4 text-sm text-amber-800 shadow-sm">Could not identify the backend user session yet.</div>
       ) : null}
 
       <DataTable
