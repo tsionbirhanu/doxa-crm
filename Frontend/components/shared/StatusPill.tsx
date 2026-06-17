@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export type StatusPillType = "lead" | "deal" | "task" | "health" | "campaign";
+export type StatusPillType = "lead" | "deal" | "task" | "health" | "campaign" | "role";
 
 interface StatusPillProps {
   status: string;
@@ -24,6 +24,15 @@ const statusStyles: Record<StatusPillType, Record<string, string>> = {
     green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
     red: "bg-red-50 text-red-700 ring-red-100",
     yellow: "bg-amber-50 text-amber-700 ring-amber-100",
+  },
+  role: {
+    customer_success: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    marketing_manager: "bg-amber-50 text-amber-700 ring-amber-100",
+    marketing_rep: "bg-amber-50 text-amber-700 ring-amber-100",
+    read_only: "bg-slate-100 text-[#64748B] ring-slate-200",
+    sales_manager: "bg-blue-50 text-[#2563EB] ring-blue-100",
+    sales_rep: "bg-blue-50 text-[#2563EB] ring-blue-100",
+    super_admin: "bg-[#0F2444]/10 text-[#0F2444] ring-[#0F2444]/10",
   },
   lead: {
     contacted: "bg-blue-50 text-[#2563EB] ring-blue-100",

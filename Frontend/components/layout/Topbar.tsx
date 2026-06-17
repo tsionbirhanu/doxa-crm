@@ -2,16 +2,9 @@
 
 import { Bell, Menu, Search, UserCircle } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { SearchModal } from "@/components/search/SearchModal";
 import { authClient } from "@/lib/auth-client";
 import { normalizeRole } from "@/lib/auth-types";
 import { getInitials } from "@/lib/utils";
@@ -51,6 +44,21 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     "Doxa User";
   const role = normalizeRole(sessionUser?.role ?? storedUser?.role);
 
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      const isSearchShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+      if (!isSearchShortcut) {
+        return;
+      }
+
+      event.preventDefault();
+      setSearchOpen(true);
+    }
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6">
       <div className="flex min-w-0 items-center gap-3">
@@ -69,27 +77,16 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-          <DialogTrigger asChild>
-            <button
-              className="hidden h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-[#64748B] hover:bg-slate-50 sm:inline-flex"
-              type="button"
-            >
-              <Search className="h-4 w-4" aria-hidden="true" />
-              Search
-            </button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Global search</DialogTitle>
-              <DialogDescription>Search contacts, accounts, deals, and leads from one place.</DialogDescription>
-            </DialogHeader>
-            <div className="flex h-11 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm text-[#64748B]">
-              <Search className="h-4 w-4" aria-hidden="true" />
-              <span>Search modal ready for the global search API.</span>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <button
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-[#64748B] hover:bg-slate-50"
+          onClick={() => setSearchOpen(true)}
+          onFocus={() => setSearchOpen(true)}
+          type="button"
+        >
+          <Search className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden sm:inline">Search</span>
+          <span className="hidden rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-medium text-slate-400 lg:inline">Ctrl K</span>
+        </button>
 
         <button
           aria-label="Notifications"
@@ -113,6 +110,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           </span>
         </button>
       </div>
+      <SearchModal onOpenChange={setSearchOpen} open={searchOpen} />
     </header>
   );
 }

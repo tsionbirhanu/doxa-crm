@@ -1,0 +1,319 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api";
+import type { Account, Activity, ActivityCreate, Contact, Deal, Lead } from "@/types/api";
+
+const activityTypes = ["call", "email", "meeting", "note"] as const;
+
+const activityFormSchema = z
+  .object({
+    account_id: z.string().optional(),
+    body: z.string().min(1, "Body is required."),
+    contact_id: z.string().optional(),
+    deal_id: z.string().optional(),
+    duration_minutes: z.string().optional(),
+    lead_id: z.string().optional(),
+    outcome: z.string().optional(),
+    scheduled_at: z.string().optional(),
+    subject: z.string().min(1, "Subject is required."),
+    type: z.enum(activityTypes),
+  })
+  .refine((value) => Boolean(value.lead_id || value.contact_id || value.deal_id || value.account_id), {
+    message: "Link at least one entity.",
+    path: ["lead_id"],
+  });
+
+type ActivityFormValues = z.infer<typeof activityFormSchema>;
+
+export interface ActivityInitialLink {
+  type: "lead" | "contact" | "deal" | "account";
+  id: string;
+  label?: string | null;
+}
+
+interface ActivityFormProps {
+  initialLink?: ActivityInitialLink;
+  onOpenChange: (open: boolean) => void;
+  onSaved?: (activity: Activity) => void;
+  open: boolean;
+}
+
+function useDebouncedValue(value: string, delayMs: number): string {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debounced;
+}
+
+function nowForInput(): string {
+  return new Date().toISOString().slice(0, 16);
+}
+
+function emptyValues(initialLink?: ActivityInitialLink): ActivityFormValues {
+  return {
+    account_id: initialLink?.type === "account" ? initialLink.id : "",
+    body: "",
+    contact_id: initialLink?.type === "contact" ? initialLink.id : "",
+    deal_id: initialLink?.type === "deal" ? initialLink.id : "",
+    duration_minutes: "",
+    lead_id: initialLink?.type === "lead" ? initialLink.id : "",
+    outcome: "",
+    scheduled_at: nowForInput(),
+    subject: "",
+    type: "call",
+  };
+}
+
+function fieldError(message?: string) {
+  return message ? <p className="mt-1 text-xs text-red-600">{message}</p> : null;
+}
+
+function toIsoOrNull(value?: string): string | null {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function buildPayload(values: ActivityFormValues): ActivityCreate {
+  return {
+    account_id: values.account_id || null,
+    body: values.body,
+    contact_id: values.contact_id || null,
+    deal_id: values.deal_id || null,
+    duration_minutes: values.duration_minutes ? Number(values.duration_minutes) : null,
+    lead_id: values.lead_id || null,
+    outcome: values.outcome || null,
+    scheduled_at: toIsoOrNull(values.scheduled_at),
+    subject: values.subject,
+    type: values.type,
+  };
+}
+
+function contactLabel(contact: Contact): string {
+  return `${contact.first_name} ${contact.last_name}`;
+}
+
+function optionLabel(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: ActivityFormProps) {
+  const queryClient = useQueryClient();
+  const [leadSearch, setLeadSearch] = useState("");
+  const [contactSearch, setContactSearch] = useState(initialLink?.type === "contact" ? initialLink.label ?? "" : "");
+  const [dealSearch, setDealSearch] = useState(initialLink?.type === "deal" ? initialLink.label ?? "" : "");
+  const [accountSearch, setAccountSearch] = useState(initialLink?.type === "account" ? initialLink.label ?? "" : "");
+  const debouncedLeadSearch = useDebouncedValue(leadSearch, 300);
+  const debouncedContactSearch = useDebouncedValue(contactSearch, 300);
+  const debouncedDealSearch = useDebouncedValue(dealSearch, 300);
+  const debouncedAccountSearch = useDebouncedValue(accountSearch, 300);
+  const form = useForm<ActivityFormValues>({
+    defaultValues: emptyValues(initialLink),
+    resolver: zodResolver(activityFormSchema),
+  });
+  const selectedType = form.watch("type");
+
+  useEffect(() => {
+    if (open) {
+      form.reset(emptyValues(initialLink));
+      setLeadSearch(initialLink?.type === "lead" ? initialLink.label ?? "" : "");
+      setContactSearch(initialLink?.type === "contact" ? initialLink.label ?? "" : "");
+      setDealSearch(initialLink?.type === "deal" ? initialLink.label ?? "" : "");
+      setAccountSearch(initialLink?.type === "account" ? initialLink.label ?? "" : "");
+    }
+  }, [form, initialLink, open]);
+
+  const leadsQuery = useQuery({
+    queryFn: () => api.get<Lead[]>("/leads/", { page_size: 50 }),
+    queryKey: ["activities", "lead-select", debouncedLeadSearch],
+  });
+  const contactsQuery = useQuery({
+    queryFn: () => api.get<Contact[]>("/contacts/", { page_size: 50, search: debouncedContactSearch || undefined }),
+    queryKey: ["activities", "contact-select", debouncedContactSearch],
+  });
+  const dealsQuery = useQuery({
+    queryFn: () => api.get<Deal[]>("/deals/", { page_size: 50 }),
+    queryKey: ["activities", "deal-select", debouncedDealSearch],
+  });
+  const accountsQuery = useQuery({
+    queryFn: () => api.get<Account[]>("/accounts/", { page_size: 100, search: debouncedAccountSearch || undefined }),
+    queryKey: ["activities", "account-select", debouncedAccountSearch],
+  });
+
+  const leadOptions = useMemo(() => {
+    const normalized = debouncedLeadSearch.trim().toLowerCase();
+    return (leadsQuery.data ?? []).filter((lead) => `${lead.full_name} ${lead.company} ${lead.email}`.toLowerCase().includes(normalized));
+  }, [debouncedLeadSearch, leadsQuery.data]);
+  const contactOptions = useMemo(() => {
+    const normalized = debouncedContactSearch.trim().toLowerCase();
+    return (contactsQuery.data ?? []).filter((contact) =>
+      `${contact.first_name} ${contact.last_name} ${contact.email}`.toLowerCase().includes(normalized),
+    );
+  }, [contactsQuery.data, debouncedContactSearch]);
+  const dealOptions = useMemo(() => {
+    const normalized = debouncedDealSearch.trim().toLowerCase();
+    return (dealsQuery.data ?? []).filter((deal) => `${deal.title} ${deal.account_name ?? ""}`.toLowerCase().includes(normalized));
+  }, [dealsQuery.data, debouncedDealSearch]);
+  const accountOptions = useMemo(() => {
+    const normalized = debouncedAccountSearch.trim().toLowerCase();
+    return (accountsQuery.data ?? []).filter((account) => account.name.toLowerCase().includes(normalized));
+  }, [accountsQuery.data, debouncedAccountSearch]);
+
+  const saveActivity = useMutation({
+    mutationFn: (values: ActivityFormValues) => api.post<Activity, ActivityCreate>("/activities/", buildPayload(values)),
+    onSuccess: (activity) => {
+      void queryClient.invalidateQueries({ queryKey: ["activities"] });
+      void queryClient.invalidateQueries({ queryKey: ["contacts", "timeline"] });
+      void queryClient.invalidateQueries({ queryKey: ["deals"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads", "activities"] });
+      onSaved?.(activity);
+      onOpenChange(false);
+    },
+  });
+
+  const submitting = saveActivity.isPending;
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Log Activity</DialogTitle>
+          <DialogDescription>Record a call, email, meeting, or note and link it to CRM records.</DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-5" onSubmit={form.handleSubmit((values) => saveActivity.mutate(values))}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="activity_type">Type</Label>
+              <select
+                className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+                disabled={submitting}
+                id="activity_type"
+                {...form.register("type")}
+              >
+                {activityTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {optionLabel(type)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end gap-2 text-sm text-[#64748B]">
+              <ActivityTypeIcon className="h-5 w-5 text-[#2563EB]" type={selectedType} />
+              {optionLabel(selectedType)}
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="activity_subject">Subject</Label>
+            <Input id="activity_subject" disabled={submitting} {...form.register("subject")} />
+            {fieldError(form.formState.errors.subject?.message)}
+          </div>
+
+          <div>
+            <Label htmlFor="activity_body">Body / Notes</Label>
+            <textarea
+              className="min-h-28 w-full rounded-md border border-[var(--input)] bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              disabled={submitting}
+              id="activity_body"
+              {...form.register("body")}
+            />
+            {fieldError(form.formState.errors.body?.message)}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="activity_scheduled_at">Scheduled At</Label>
+              <Input id="activity_scheduled_at" disabled={submitting} type="datetime-local" {...form.register("scheduled_at")} />
+            </div>
+            <div>
+              <Label htmlFor="activity_outcome">Outcome</Label>
+              <Input id="activity_outcome" disabled={submitting} {...form.register("outcome")} />
+            </div>
+            <div>
+              <Label htmlFor="activity_duration">Duration in minutes</Label>
+              <Input id="activity_duration" disabled={submitting || selectedType !== "call"} min="0" type="number" {...form.register("duration_minutes")} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label>Lead</Label>
+              <Input disabled={submitting} onChange={(event) => setLeadSearch(event.target.value)} placeholder="Search leads" value={leadSearch} />
+              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("lead_id")}>
+                <option value="">No lead</option>
+                {leadOptions.map((lead) => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Contact</Label>
+              <Input disabled={submitting} onChange={(event) => setContactSearch(event.target.value)} placeholder="Search contacts" value={contactSearch} />
+              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("contact_id")}>
+                <option value="">No contact</option>
+                {contactOptions.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contactLabel(contact)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Deal</Label>
+              <Input disabled={submitting} onChange={(event) => setDealSearch(event.target.value)} placeholder="Search deals" value={dealSearch} />
+              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("deal_id")}>
+                <option value="">No deal</option>
+                {dealOptions.map((deal) => (
+                  <option key={deal.id} value={deal.id}>
+                    {deal.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Account</Label>
+              <Input disabled={submitting} onChange={(event) => setAccountSearch(event.target.value)} placeholder="Search accounts" value={accountSearch} />
+              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("account_id")}>
+                <option value="">No account</option>
+                {accountOptions.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {fieldError(form.formState.errors.lead_id?.message)}
+          {saveActivity.isError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not save activity.</div> : null}
+
+          <div className="flex justify-end gap-3">
+            <Button disabled={submitting} onClick={() => onOpenChange(false)} type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button className="bg-[#2563EB] hover:bg-blue-700" disabled={submitting} type="submit">
+              <Save className="h-4 w-4" aria-hidden="true" />
+              Save Activity
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

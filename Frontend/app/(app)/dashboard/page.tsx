@@ -1,96 +1,83 @@
-"use client";
+import { format } from "date-fns";
+import { Suspense } from "react";
 
-import { Activity, ArrowUpRight, BadgeDollarSign, CheckCircle2, Users } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { LeadFunnelChart } from "@/components/dashboard/LeadFunnelChart";
+import { OverdueTasksList } from "@/components/dashboard/OverdueTasksList";
+import { PipelineChart } from "@/components/dashboard/PipelineChart";
+import { StaleDealsWidget } from "@/components/dashboard/StaleDealsWidget";
+import { StatsRow } from "@/components/dashboard/StatsRow";
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+export const dynamic = "force-dynamic";
 
-const pipelineData = [
-  { stage: "Prospecting", value: 42000 },
-  { stage: "Qualified", value: 76000 },
-  { stage: "Proposal", value: 118000 },
-  { stage: "Negotiation", value: 92000 },
-  { stage: "Won", value: 54000 },
-];
+function StatsFallback() {
+  return (
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {["open", "leads", "tasks", "activities"].map((item) => (
+        <div className="rounded-xl bg-white p-5 shadow-sm" key={item}>
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="mt-3 h-8 w-20" />
+          <Skeleton className="mt-4 h-4 w-32" />
+        </div>
+      ))}
+    </section>
+  );
+}
 
-const metrics = [
-  { label: "Open deals", value: "128", icon: BadgeDollarSign, tone: "text-[#2f6f73]" },
-  { label: "Contacts", value: "2,438", icon: Users, tone: "text-[#0f2a44]" },
-  { label: "Activities today", value: "46", icon: Activity, tone: "text-[#8a6b1f]" },
-  { label: "Tasks done", value: "31", icon: CheckCircle2, tone: "text-emerald-700" },
-] as const;
+function ChartFallback() {
+  return (
+    <div className="rounded-xl bg-white p-5 shadow-sm">
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="mt-2 h-4 w-56" />
+      <Skeleton className="mt-5 h-[280px] w-full rounded-xl" />
+    </div>
+  );
+}
 
-function formatCurrencyTooltip(value: unknown): [string, string] {
-  const numericValue = typeof value === "number" ? value : Number(value ?? 0);
-  return [formatCurrency(numericValue), "Value"];
+function ListFallback() {
+  return (
+    <div className="rounded-xl bg-white p-5 shadow-sm">
+      <Skeleton className="h-5 w-36" />
+      <Skeleton className="mt-2 h-4 w-64" />
+      <div className="mt-5 space-y-3">
+        {[1, 2, 3].map((item) => (
+          <Skeleton className="h-16 w-full rounded-lg" key={item} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
-  const [chartReady, setChartReady] = useState(false);
-
-  useEffect(() => {
-    setChartReady(true);
-  }, []);
+  const today = format(new Date(), "EEEE, MMMM d, yyyy");
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Dashboard" subtitle="Revenue, pipeline, and work queue overview." />
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <Card key={metric.label}>
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">{metric.label}</CardTitle>
-              <metric.icon className={`h-4 w-4 ${metric.tone}`} aria-hidden="true" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold text-slate-950">{metric.value}</div>
-              <div className="mt-2 flex items-center gap-1 text-xs text-emerald-700">
-                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-                Updated from CRM API
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <header>
+        <h1 className="text-2xl font-semibold tracking-normal text-[#0F2444]">Dashboard</h1>
+        <p className="mt-1 text-sm text-[#64748B]">{today}</p>
+      </header>
+
+      <Suspense fallback={<StatsFallback />}>
+        <StatsRow />
+      </Suspense>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+        <Suspense fallback={<ChartFallback />}>
+          <PipelineChart />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <LeadFunnelChart />
+        </Suspense>
       </section>
-      <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Pipeline value</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              {chartReady ? (
-                <ResponsiveContainer height="100%" width="100%">
-                  <BarChart data={pipelineData}>
-                    <CartesianGrid stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="stage" fontSize={12} tickLine={false} />
-                    <YAxis fontSize={12} tickFormatter={(value: number) => `$${Math.round(value / 1000)}k`} tickLine={false} />
-                    <Tooltip formatter={formatCurrencyTooltip} />
-                    <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full rounded-md bg-slate-50" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Today</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {["Review stale deals", "Call top inbound leads", "Approve campaign sequence", "Check overdue tasks"].map((item) => (
-              <div className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2" key={item}>
-                <span className="text-sm text-slate-700">{item}</span>
-                <CheckCircle2 className="h-4 w-4 text-slate-300" aria-hidden="true" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <Suspense fallback={<ListFallback />}>
+          <OverdueTasksList />
+        </Suspense>
+        <Suspense fallback={<ListFallback />}>
+          <StaleDealsWidget />
+        </Suspense>
       </section>
     </div>
   );

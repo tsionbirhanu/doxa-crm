@@ -1,0 +1,241 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Activity, Edit, RefreshCcw, Repeat2, UserCheck } from "lucide-react";
+import { useState } from "react";
+
+import { ActivityForm } from "@/components/activities/ActivityForm";
+import { AssignLeadDialog } from "@/components/leads/AssignLeadDialog";
+import { ConvertModal } from "@/components/leads/ConvertModal";
+import { LeadForm } from "@/components/leads/LeadForm";
+import { LeadScoreBar } from "@/components/leads/LeadScoreBar";
+import { ActivityTimeline, type ActivityTimelineItem } from "@/components/shared/ActivityTimeline";
+import { StatusPill } from "@/components/shared/StatusPill";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
+import { cn, formatDate } from "@/lib/utils";
+import type { Activity as ActivityRecord, Lead, LeadScoreResponse } from "@/types/api";
+
+interface LeadDetailClientProps {
+  leadId: string;
+}
+
+function sourceLabel(source: string): string {
+  return source
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function lifecycleItems(lead: Lead) {
+  const items = [
+    {
+      detail: `Lead entered as ${sourceLabel(lead.source)}.`,
+      label: "Created",
+      timestamp: lead.created_at,
+    },
+  ];
+
+  if (lead.updated_at !== lead.created_at) {
+    items.push({
+      detail: `Current status is ${sourceLabel(lead.status)}.`,
+      label: "Updated",
+      timestamp: lead.updated_at,
+    });
+  }
+
+  if (lead.converted_at) {
+    items.push({
+      detail: "Converted leads cannot move back to an earlier status.",
+      label: "Converted",
+      timestamp: lead.converted_at,
+    });
+  }
+
+  return items.sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime());
+}
+
+export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
+  const queryClient = useQueryClient();
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+
+  const leadQuery = useQuery({
+    queryFn: () => api.get<Lead>(`/leads/${leadId}`),
+    queryKey: ["leads", "detail", leadId],
+  });
+  const activitiesQuery = useQuery({
+    queryFn: () => api.get<ActivityRecord[]>("/activities/", { lead_id: leadId, page_size: 20 }),
+    queryKey: ["leads", "activities", leadId],
+  });
+  const scoreMutation = useMutation({
+    mutationFn: () => api.post<LeadScoreResponse>(`/leads/${leadId}/score`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads", "detail", leadId] });
+    },
+  });
+
+  const lead = leadQuery.data;
+
+  if (leadQuery.isLoading) {
+    return (
+      <div className="grid gap-6">
+        <Skeleton className="h-32 rounded-xl" />
+        <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+          <Skeleton className="h-96 rounded-xl" />
+          <Skeleton className="h-96 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (leadQuery.isError || !lead) {
+    return <div className="rounded-xl border border-red-100 bg-white p-5 text-sm text-red-700 shadow-sm">Could not load lead.</div>;
+  }
+
+  const timelineItems: ActivityTimelineItem[] = (activitiesQuery.data ?? []).map((activity) => ({
+    date: activity.completed_at ?? activity.scheduled_at ?? activity.created_at,
+    description: activity.body,
+    id: activity.id,
+    outcome: activity.outcome,
+    subject: activity.subject,
+    type: activity.type,
+  }));
+
+  return (
+    <div className="grid gap-6">
+      <section className="rounded-xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-normal text-[#0F2444]">{lead.full_name}</h1>
+              <StatusPill status={lead.status} type="lead" />
+            </div>
+            <p className="mt-1 text-sm text-[#64748B]">{lead.company}</p>
+            <LeadScoreBar className="mt-4 max-w-sm" score={lead.score} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={lead.status === "converted"} onClick={() => setConvertOpen(true)} type="button">
+              <Repeat2 className="h-4 w-4" aria-hidden="true" />
+              Convert
+            </Button>
+            <Button onClick={() => setAssignOpen(true)} type="button" variant="outline">
+              <UserCheck className="h-4 w-4" aria-hidden="true" />
+              Assign
+            </Button>
+            <Button disabled={scoreMutation.isPending} onClick={() => scoreMutation.mutate()} type="button" variant="outline">
+              <RefreshCcw className={cn("h-4 w-4", scoreMutation.isPending && "animate-spin")} aria-hidden="true" />
+              Recalculate Score
+            </Button>
+            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+              <Edit className="h-4 w-4" aria-hidden="true" />
+              Edit
+            </Button>
+            <Button onClick={() => setActivityOpen(true)} type="button" variant="ghost">
+              <Activity className="h-4 w-4" aria-hidden="true" />
+              Log Activity
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <section className="rounded-xl bg-white p-5 shadow-sm">
+          <h2 className="text-base font-semibold text-[#0F2444]">Status History</h2>
+          <p className="mt-1 text-sm text-[#64748B]">Lifecycle events available on this lead record.</p>
+          <div className="mt-5 space-y-4">
+            {lifecycleItems(lead).map((item) => (
+              <article className="flex gap-4 rounded-xl border border-slate-100 p-4" key={`${item.label}-${item.timestamp}`}>
+                <div className="mt-1 h-3 w-3 shrink-0 rounded-full bg-[#2563EB]" />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-[#0F2444]">{item.label}</h3>
+                    <span className="text-xs text-[#64748B]">{formatDate(item.timestamp)}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-700">{item.detail}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-[#0F2444]">Activities</h2>
+                <p className="mt-1 text-sm text-[#64748B]">Logged work against this lead.</p>
+              </div>
+              <Button onClick={() => setActivityOpen(true)} size="sm" type="button" variant="outline">
+                Log Activity
+              </Button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {activitiesQuery.isLoading ? [1, 2, 3].map((item) => <Skeleton className="h-20 rounded-lg" key={item} />) : null}
+              {!activitiesQuery.isLoading ? <ActivityTimeline items={timelineItems} /> : null}
+            </div>
+          </div>
+        </section>
+
+        <aside className="grid gap-4 content-start">
+          <section className="rounded-xl bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-[#0F2444]">Lead Info</h2>
+            <dl className="mt-4 grid gap-3 text-sm">
+              <div>
+                <dt className="text-[#64748B]">Email</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.email}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">Phone</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.phone}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">Source</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{sourceLabel(lead.source)}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">Assigned To</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.assigned_to_name ?? lead.assigned_to.slice(0, 8)}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">Campaign</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.campaign_id ?? "None"}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">UTM Source</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_source ?? "None"}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">UTM Campaign</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_campaign ?? "None"}</dd>
+              </div>
+              <div>
+                <dt className="text-[#64748B]">UTM Medium</dt>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_medium ?? "None"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          {lead.status === "converted" ? (
+            <section className="rounded-xl border border-amber-100 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
+              <h2 className="font-semibold">Converted Lead</h2>
+              <p className="mt-2">This lead cannot be moved back to an earlier status.</p>
+            </section>
+          ) : null}
+        </aside>
+      </div>
+
+      <ConvertModal lead={lead} onOpenChange={setConvertOpen} open={convertOpen} />
+      <AssignLeadDialog leadIds={[lead.id]} onAssigned={() => void leadQuery.refetch()} onOpenChange={setAssignOpen} open={assignOpen} />
+      <LeadForm lead={lead} onOpenChange={setEditOpen} onSaved={() => void leadQuery.refetch()} open={editOpen} />
+      <ActivityForm
+        initialLink={{ id: lead.id, label: lead.full_name, type: "lead" }}
+        onOpenChange={setActivityOpen}
+        onSaved={() => void activitiesQuery.refetch()}
+        open={activityOpen}
+      />
+    </div>
+  );
+}

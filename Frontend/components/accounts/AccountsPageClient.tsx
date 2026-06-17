@@ -1,0 +1,171 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { Building2, Plus } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+import { AccountForm } from "@/components/accounts/AccountForm";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { api } from "@/lib/api";
+import { cn, formatCurrency } from "@/lib/utils";
+import type { Account, AccountTier, User } from "@/types/api";
+
+const PAGE_SIZE = 20;
+
+interface AccountFilters {
+  owner_id: string;
+  tier: string;
+}
+
+function formatTier(tier: string): string {
+  return tier
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function TierPill({ tier }: { tier: string }) {
+  const tone =
+    tier === "enterprise"
+      ? "bg-[#0F2444]/10 text-[#0F2444] ring-[#0F2444]/10"
+      : tier === "startup"
+        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+        : "bg-blue-50 text-[#2563EB] ring-blue-100";
+
+  return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset", tone)}>{formatTier(tier)}</span>;
+}
+
+function toQueryParams(page: number, filters: AccountFilters) {
+  return {
+    owner_id: filters.owner_id || undefined,
+    page,
+    page_size: PAGE_SIZE,
+    tier: filters.tier || undefined,
+  };
+}
+
+export function AccountsPageClient() {
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<AccountFilters>({ owner_id: "", tier: "" });
+  const [formOpen, setFormOpen] = useState(false);
+
+  const accountsQuery = useQuery({
+    queryFn: () => api.get<Account[]>("/accounts/", toQueryParams(page, filters)),
+    queryKey: ["accounts", "list", page, filters],
+  });
+  const usersQuery = useQuery({
+    queryFn: () => api.get<User[]>("/users/"),
+    queryKey: ["users", "filter-options"],
+    retry: false,
+  });
+
+  const accounts = accountsQuery.data ?? [];
+  const columns = useMemo<Array<DataTableColumn<Account>>>(
+    () => [
+      {
+        cell: (account) => (
+          <Link className="font-semibold text-[#0F2444] hover:text-[#2563EB]" href={`/accounts/${account.id}`}>
+            {account.name}
+          </Link>
+        ),
+        header: "Name",
+        id: "name",
+      },
+      { accessor: "industry", header: "Industry", id: "industry" },
+      { accessor: "size", header: "Size", id: "size" },
+      { cell: (account) => <TierPill tier={account.tier} />, header: "Tier", id: "tier" },
+      {
+        cell: (account) => account.linked_contact_count ?? account.contact_count ?? 0,
+        header: "Contact Count",
+        id: "contact_count",
+      },
+      {
+        cell: (account) => formatCurrency(Number(account.total_deal_value ?? 0)),
+        header: "Deal Value",
+        id: "deal_value",
+      },
+      {
+        cell: (account) => account.owner_name ?? account.owner_id.slice(0, 8),
+        header: "Owner",
+        id: "owner",
+      },
+    ],
+    [],
+  );
+
+  function updateFilter(key: keyof AccountFilters, value: string) {
+    setPage(1);
+    setFilters((currentFilters) => ({ ...currentFilters, [key]: value }));
+  }
+
+  return (
+    <div className="grid gap-6">
+      <PageHeader
+        primaryAction={{ icon: Plus, label: "New Account", onClick: () => setFormOpen(true) }}
+        subtitle="Manage companies, linked contacts, and deal value."
+        title="Accounts"
+      />
+
+      <section className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-2">
+          <select
+            className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+            onChange={(event) => updateFilter("tier", event.target.value)}
+            value={filters.tier}
+          >
+            <option value="">All tiers</option>
+            {(["enterprise", "smb", "startup"] satisfies AccountTier[]).map((tier) => (
+              <option key={tier} value={tier}>
+                {formatTier(tier)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+            onChange={(event) => updateFilter("owner_id", event.target.value)}
+            value={filters.owner_id}
+          >
+            <option value="">All owners</option>
+            {(usersQuery.data ?? []).map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      {accounts.length === 0 && !accountsQuery.isLoading && !accountsQuery.isError ? (
+        <EmptyState
+          action={{ label: "New Account", onClick: () => setFormOpen(true) }}
+          description="Create the first company account or adjust your filters."
+          icon={Building2}
+          title="No accounts found"
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={accounts}
+          emptyMessage="No accounts found."
+          getRowKey={(account) => account.id}
+          isLoading={accountsQuery.isLoading}
+          pagination={{
+            hasNextPage: accounts.length === PAGE_SIZE,
+            page,
+            pageSize: PAGE_SIZE,
+            onPageChange: setPage,
+          }}
+        />
+      )}
+
+      {accountsQuery.isError ? (
+        <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load accounts.</div>
+      ) : null}
+
+      <AccountForm onOpenChange={setFormOpen} open={formOpen} />
+    </div>
+  );
+}

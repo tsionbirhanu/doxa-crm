@@ -219,6 +219,21 @@ export interface Account {
   updated_at: ISODateTime;
 }
 
+export interface AccountDeal {
+  id: UUID;
+  title: string;
+  value: DecimalValue;
+  currency: string;
+  status: DealStatus;
+  expected_close: ISODate;
+  contact_id: UUID;
+  account_id: UUID;
+  owner_id: UUID;
+  stage_name?: string | null;
+  created_at: ISODateTime;
+  updated_at: ISODateTime;
+}
+
 export interface AccountCreate {
   name: string;
   industry: string;

@@ -76,7 +76,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       {
-        hiddenFor: ["marketing_rep", "read_only", "sales_rep"],
+        hiddenFor: ["customer_success", "marketing_manager", "marketing_rep", "read_only", "sales_rep"],
         href: "/settings",
         icon: Settings,
         label: "Settings",
