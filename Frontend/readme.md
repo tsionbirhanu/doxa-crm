@@ -1,71 +1,491 @@
-# Doxa CRM - Short Project Status
+# Doxa CRM Frontend
 
-Last checked: 2026-06-15
+Next.js frontend for Doxa CRM. It provides the authenticated CRM workspace, BetterAuth login, dashboard, leads, contacts, accounts, pipeline Kanban, activities, tasks, campaigns, projects, reports, global search, settings, and public customer portal.
 
-## What exists now
+## Tech Stack
 
-- The project currently has a strong backend foundation.
-- The frontend folder only has this README right now. No frontend app code is built yet.
-- The backend is a FastAPI API with PostgreSQL/Supabase support, Redis, Celery workers/Beat, Meilisearch, Docker, Alembic migrations, JWT auth, users, accounts, contacts, leads, pipelines, deals, activities, tasks, campaigns, customer projects, reporting, global search, webhooks, audit logging, rate limiting, and GDPR contact export/purge.
+- Next.js 15 App Router
+- React 19
+- TypeScript strict mode
+- Tailwind CSS v4
+- BetterAuth
+- TanStack Query v5
+- Zustand
+- shadcn-style local UI components
+- Sonner toasts
+- Recharts
+- @hello-pangea/dnd for Kanban drag and drop
+- react-hook-form and zod
+- lucide-react icons
 
-## Backend summary
+## Local URLs
 
-- `app/main.py` creates the FastAPI app and exposes `/health`.
-- `app/config.py` loads environment variables from `.env`.
-- `app/database.py` creates the async SQLAlchemy database engine.
-- `app/models/` contains the CRM database models.
-- `alembic/versions/0001_initial_crm_models.py` creates the first database schema.
-- `app/workers/` sets up Celery with Redis and has a simple health-check task.
-- `app/routers/users.py` adds user management routes.
-- `app/routers/accounts.py` adds account CRUD, account contacts, and account deals routes.
-- `app/routers/contacts.py` adds contact CRUD, tags, filters, and timeline routes.
-- `app/routers/leads.py` adds lead CRUD, CSV import, scoring, assignment, duplicates, merge, and conversion routes.
-- `app/routers/pipelines.py` adds pipeline and stage management routes.
-- `app/routers/deals.py` adds deal CRUD, Kanban, forecast, stale deals, stage movement, won/lost, and collaborators.
-- `app/routers/activities.py` adds activity logging, filtering, detail/update/delete, and email drop-box logging.
-- `app/routers/tasks.py` adds task CRUD, overdue tasks, complete, and snooze routes.
-- `app/routers/campaigns.py` adds campaign CRUD, enrollments, sequence steps, metrics, activation, pause, and unsubscribe routes.
-- `app/routers/projects.py` adds project CRUD, from-deal creation, milestones, documents, and a public customer portal route.
-- `app/routers/reports.py` adds sales, lead, activity, customer, dashboard, custom builder, CSV export, and PDF export report routes.
-- `app/routers/search.py` adds global full-text search across contacts, deals, accounts, and leads.
-- `app/routers/webhooks.py` adds signed inbound lead, email, calendar webhooks plus outbound webhook subscriptions.
-- `app/middleware/audit.py` adds automatic audit logging for database writes during POST/PATCH/DELETE work.
-- `app/middleware/rate_limit.py` adds SlowAPI rate limiting: global 100/min/IP and portal 60/min/IP.
-- `app/models/audit.py` stores audit log rows with user, action, entity, old/new values, IP, and timestamp.
-- `app/routers/contacts.py` now includes GDPR export and super-admin purge endpoints.
-- `Backend/Dockerfile` is now a multi-stage production build with a non-root user, `/health` health check, and Alembic upgrade on container startup.
-- `app/workers/` has Celery tasks for campaigns, notifications, reports, projects, lead scoring, retries, and task logs.
+```text
+Frontend:         http://localhost:3000
+Backend API:      http://localhost:8001
+Backend docs:     http://localhost:8001/docs
+Customer portal:  http://localhost:3000/portal/{portal_token}
+```
 
-## CRM data already modeled
+## Important Folders
 
-- Users, roles, and user role assignments.
-- Leads and lead status/source tracking.
-- Accounts, contacts, tags, and custom fields.
-- Pipelines, pipeline stages, deals, and deal collaborators.
-- Activities and tasks.
-- Campaigns, campaign enrollments, and sequence steps.
-- Projects, milestones, project documents, and report snapshots.
-- Sales quotas and daily report snapshots.
-- Celery task logs for background job start/success/error tracking.
-- Meilisearch indexes for contacts, deals, accounts, and leads.
-- Webhook subscriptions and webhook logs for inbound/outbound integrations.
-- Audit logs for create/update/delete database changes.
+```text
+Frontend/
+  app/                         Next.js App Router pages and layouts
+  app/(auth)/login             Login page
+  app/(app)/                   Authenticated CRM pages
+  app/portal/[token]           Public customer portal
+  components/layout/           Sidebar, topbar, page header
+  components/shared/           Reusable table, timeline, dialogs, empty states
+  components/dashboard/        Dashboard widgets and charts
+  components/leads/            Lead list, forms, import, conversion, duplicates
+  components/contacts/         Contact list, detail, forms
+  components/accounts/         Account list, detail, forms
+  components/deals/            Pipeline, Kanban, deal detail, forecast
+  components/activities/       Activity log and forms
+  components/tasks/            Task list, forms, snooze
+  components/campaigns/        Campaign list, sequence builder, enrollments, metrics
+  components/projects/         Project list, detail, milestones, documents
+  components/reports/          Analytics tabs and charts
+  components/search/           Global search modal and page
+  components/settings/         Users and pipeline settings
+  components/ui/               Local UI primitives
+  hooks/                       Reusable React hooks
+  lib/                         API client, auth config, utilities
+  stores/                      Zustand stores
+  types/                       Shared TypeScript API types
+  scripts/                     BetterAuth user seed script
+```
 
-## What is not built yet
+## Environment Variables
 
-- More frontend UI and end-to-end reporting integrations are still needed.
-- Some folders such as `utils` are still placeholders.
-- No frontend UI exists yet.
-- The test suite passes, but coverage is currently below the requested 80% target.
+Create `Frontend/.env` from `Frontend/.env.local.example`.
 
-## What I did in this scan
+```powershell
+cd C:\Users\Hp\Desktop\Doxa-CRM\Frontend
+copy .env.local.example .env
+```
 
-- Checked the project folder structure.
-- Read the backend settings, database, API startup, Docker, worker, migration, and model files.
-- Added BetterAuth JWT validation, user management, accounts/contacts, lead management, sales pipeline/deals, activity/task management, marketing campaigns, customer projects, reporting/analytics, the complete Celery background job system, Meilisearch full-text search, signed webhooks/external integrations, audit logging, rate limiting, GDPR contact export/purge, OpenAPI metadata, test fixtures, and Docker production hardening.
+Required values:
 
-## Latest verification
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8001
+API_INTERNAL_URL=http://localhost:8001
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+BETTER_AUTH_SECRET=<must-match-backend-SECRET_KEY>
+BETTER_AUTH_URL=http://localhost:3000
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
+DATABASE_URL=postgresql://...
+```
 
-- `python -m compileall app alembic tests scripts` passes.
-- `python -m pytest -q` passes.
-- `python -m pytest --cov=app --cov-report=term-missing -q` runs, but current coverage is about 62%, not yet 80%.
+Important:
+
+- `BETTER_AUTH_SECRET` must be exactly the same as backend `SECRET_KEY`
+- Frontend `DATABASE_URL` must be a normal `postgresql://` URL for the `pg` package
+- Backend `DATABASE_URL` uses `postgresql+asyncpg://`
+- Do not put Meilisearch keys in the frontend env
+- Do not commit `.env`
+
+## Install And Run Locally
+
+```powershell
+cd C:\Users\Hp\Desktop\Doxa-CRM\Frontend
+npm install --legacy-peer-deps
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+Build for production:
+
+```powershell
+npm run build
+npm run start
+```
+
+Type-check:
+
+```powershell
+npm run typecheck
+```
+
+## Run With Docker Compose
+
+The main `docker-compose.yml` is in the backend folder and starts both backend and frontend.
+
+```powershell
+cd C:\Users\Hp\Desktop\Doxa-CRM\Backend
+docker compose up -d --build
+```
+
+Check services:
+
+```powershell
+docker compose ps
+```
+
+Rebuild only frontend:
+
+```powershell
+docker compose up -d --build frontend
+```
+
+View frontend logs:
+
+```powershell
+docker compose logs -f frontend
+```
+
+## Authentication
+
+Login is handled by BetterAuth on the Next.js side.
+
+Key files:
+
+```text
+lib/auth.ts              BetterAuth server configuration
+lib/auth-client.ts       BetterAuth browser client
+lib/auth-token.ts        Gets FastAPI bearer token and current session user
+middleware.ts            Protects authenticated routes
+app/(auth)/login/page.tsx Login screen
+```
+
+The frontend gets a JWT from BetterAuth and sends it to FastAPI:
+
+```http
+Authorization: Bearer <token>
+```
+
+The backend validates the token with `SECRET_KEY`.
+
+If you see `token expired`, clear local storage key:
+
+```text
+doxa-crm-auth
+```
+
+Then sign in again.
+
+## Demo Login Users
+
+After running the backend seed script and frontend auth seed script:
+
+```powershell
+cd C:\Users\Hp\Desktop\Doxa-CRM\Frontend
+node scripts\seed-auth-users.mjs
+```
+
+Use password:
+
+```text
+DoxaDemo123!
+```
+
+Demo accounts:
+
+```text
+admin@doxa.local              super_admin
+sales.manager@doxa.local      sales_manager
+alex.rep@doxa.local           sales_rep
+maya.rep@doxa.local           sales_rep
+marketing.manager@doxa.local  marketing_manager
+marketing.rep@doxa.local      marketing_rep
+success@doxa.local            customer_success
+readonly@doxa.local           read_only
+```
+
+## Main Pages
+
+Authenticated CRM pages:
+
+```text
+/dashboard
+/leads
+/contacts
+/accounts
+/pipeline
+/deals
+/activities
+/tasks
+/campaigns
+/projects
+/reports
+/search
+/settings
+/settings/users
+/settings/pipeline
+/settings/integrations
+/settings/billing
+```
+
+Public page:
+
+```text
+/portal/{portal_token}
+```
+
+`/pipeline` redirects to `/deals`, which is the sales pipeline Kanban page.
+
+## Feature Map
+
+### Dashboard
+
+- Open deals
+- Leads this month
+- Overdue tasks
+- Activities this week
+- Pipeline chart
+- Overdue task widget
+- Stale deals widget
+- Lead funnel
+
+### Leads
+
+- List and filter leads
+- Create and edit leads
+- Assign leads
+- Recalculate lead score
+- Import CSV
+- Duplicate review
+- Convert lead into contact, optional account, optional deal
+
+### Contacts
+
+- List and filter contacts
+- Create and edit contacts
+- Tags
+- Custom fields
+- Archive contacts
+- Contact detail page
+- Activity timeline
+- Linked account
+- Open deals summary
+
+### Accounts
+
+- List and filter accounts
+- Create and edit accounts
+- Account detail page
+- Contacts tab
+- Deals tab
+- Activity/info sidebar
+
+### Pipeline And Deals
+
+- Pipeline selector
+- Kanban board
+- Drag deals between stages
+- Forecast values
+- Create and edit deals
+- Mark won/lost
+- Lost reason modal
+- Deal detail page
+- Collaborators
+- Stage history
+- Create project from closed-won deal
+
+### Activities And Tasks
+
+- Activity log
+- Log calls, emails, meetings, and notes
+- Email logging
+- My Tasks and All Tasks
+- Complete tasks
+- Snooze tasks
+- Overdue task warning
+
+### Campaigns
+
+- Campaign list
+- Create and edit campaigns
+- Activate and pause campaigns
+- Sequence step builder
+- Drag reorder sequence steps
+- Enroll contacts
+- Metrics charts
+
+### Projects
+
+- Project list
+- Create project manually
+- Create project from closed-won deal
+- Milestones
+- Documents
+- Health status
+- Copy customer portal link
+
+### Reports
+
+- Sales reports
+- Lead reports
+- Activity reports
+- Customer reports
+- CSV/PDF export buttons
+- Charts with Recharts
+
+### Search
+
+- Global search modal from the topbar
+- Keyboard shortcut Ctrl+K or Cmd+K
+- Full `/search` page
+- Searches contacts, accounts, deals, and leads
+
+### Settings
+
+- User management
+- Pipeline configuration
+- Integrations placeholder
+- Billing placeholder
+
+## API Client
+
+Key file:
+
+```text
+lib/api.ts
+```
+
+It:
+
+- Builds URLs from `NEXT_PUBLIC_API_URL`
+- Adds `Authorization: Bearer <token>`
+- Refreshes expired tokens
+- Parses backend error shapes
+- Supports JSON and multipart form uploads
+
+Most server data is loaded with TanStack Query.
+
+## Styling
+
+Design system:
+
+```text
+Navy:  #0F2444
+Blue:  #2563EB
+Sky:   #EFF6FF
+Slate: #64748B
+White: #FFFFFF
+```
+
+Common UI rules:
+
+- White cards on sky background
+- Rounded-xl cards with shadow-sm
+- Lucide icons
+- Reusable `StatusPill`
+- Reusable `DataTable`
+- Reusable `EmptyState`
+- Reusable `ActivityTimeline`
+
+## Testing Checklist
+
+Run type-check:
+
+```powershell
+npm run typecheck
+```
+
+Run production build:
+
+```powershell
+npm run build
+```
+
+Manual smoke test:
+
+```text
+1. Login as admin@doxa.local
+2. Open /dashboard
+3. Open /leads and create a lead
+4. Convert the lead into a contact
+5. Open /contacts and find the new contact
+6. Open /pipeline and drag a deal
+7. Open /tasks and complete a task
+8. Open /search and search for a contact
+9. Open /settings/users as super admin
+10. Open a project portal link without logging in
+```
+
+## Common Troubleshooting
+
+### Page returns 404 after adding a route
+
+Restart the frontend:
+
+```powershell
+npm run dev
+```
+
+Or rebuild Docker:
+
+```powershell
+cd C:\Users\Hp\Desktop\Doxa-CRM\Backend
+docker compose up -d --build frontend
+```
+
+### Login works but API says token expired
+
+Clear local storage:
+
+```text
+doxa-crm-auth
+```
+
+Then sign in again.
+
+### Backend calls fail
+
+Check:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8001
+```
+
+Then verify backend:
+
+```powershell
+curl http://localhost:8001/health
+```
+
+### BetterAuth cannot connect to DB
+
+Frontend `DATABASE_URL` must start with:
+
+```text
+postgresql://
+```
+
+Not:
+
+```text
+postgresql+asyncpg://
+```
+
+### Docker browser cannot reach backend
+
+For local browser use:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8001
+```
+
+For server-side Docker calls:
+
+```env
+API_INTERNAL_URL=http://api:8000
+```
+
+## Production Notes
+
+- Keep `.env` files out of Git
+- Use a strong `BETTER_AUTH_SECRET`
+- Keep `BETTER_AUTH_SECRET` equal to backend `SECRET_KEY`
+- Use HTTPS URLs in production
+- Point `NEXT_PUBLIC_API_URL` to the public API URL
+- Point `API_INTERNAL_URL` to the internal API URL if using Docker/Kubernetes networking
+- Run `npm run build` before deployment
+
