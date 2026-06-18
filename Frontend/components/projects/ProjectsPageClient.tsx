@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { HealthPill } from "@/components/projects/HealthPill";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { cn, formatDate } from "@/lib/utils";
 import type { Project, ProjectHealth, User } from "@/types/api";
 
@@ -38,6 +39,7 @@ function milestoneStats(project: Project) {
 }
 
 export function ProjectsPageClient() {
+  const { canWriteProjects } = usePermissions();
   const [formOpen, setFormOpen] = useState(false);
   const [health, setHealth] = useState("");
   const [ownerId, setOwnerId] = useState("");
@@ -62,7 +64,7 @@ export function ProjectsPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Project", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteProjects ? { icon: Plus, label: "New Project", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Track customer onboarding work, milestones, documents, and portal access."
         title="Projects"
       />
@@ -98,7 +100,7 @@ export function ProjectsPageClient() {
 
       {!projectsQuery.isLoading && projects.length === 0 && !projectsQuery.isError ? (
         <EmptyState
-          action={{ label: "New Project", onClick: () => setFormOpen(true) }}
+          action={canWriteProjects ? { label: "New Project", onClick: () => setFormOpen(true) } : undefined}
           description="Create a project manually or convert a closed-won deal into a customer project."
           icon={FolderKanban}
           title="No projects found"
@@ -156,7 +158,7 @@ export function ProjectsPageClient() {
 
       {projectsQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load projects.</div> : null}
 
-      <ProjectForm onOpenChange={setFormOpen} open={formOpen} />
+      {canWriteProjects ? <ProjectForm onOpenChange={setFormOpen} open={formOpen} /> : null}
     </div>
   );
 }

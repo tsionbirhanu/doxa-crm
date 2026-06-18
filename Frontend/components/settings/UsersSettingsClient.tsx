@@ -12,6 +12,7 @@ import { UserForm } from "@/components/settings/UserForm";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
 import type { User, UserUpdate } from "@/types/api";
@@ -26,6 +27,7 @@ function statusBadge(active: boolean) {
 
 export function UsersSettingsClient() {
   const queryClient = useQueryClient();
+  const { canManageUsers } = usePermissions();
   const session = authClient.useSession();
   const storedUser = useAuthStore((state) => state.user);
   const fallbackCurrentUserId = String(session.data?.user?.id ?? storedUser?.id ?? "");
@@ -85,6 +87,10 @@ export function UsersSettingsClient() {
       { cell: (user) => formatDate(user.created_at), header: "Created", id: "created" },
       {
         cell: (user) => {
+          if (!canManageUsers) {
+            return null;
+          }
+
           const isCurrentUser = user.id === currentUserId;
           return (
             <div className="flex items-center gap-2">
@@ -110,13 +116,13 @@ export function UsersSettingsClient() {
         id: "actions",
       },
     ],
-    [currentUserId, toggleUser],
+    [canManageUsers, currentUserId, toggleUser],
   );
 
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "Invite User", onClick: openCreateForm }}
+        primaryAction={canManageUsers ? { icon: Plus, label: "Invite User", onClick: openCreateForm } : undefined}
         subtitle="Manage CRM users, roles, and access status."
         title="User Management"
       />
@@ -132,24 +138,28 @@ export function UsersSettingsClient() {
 
       {usersQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load users.</div> : null}
 
-      <UserForm onOpenChange={setFormOpen} open={formOpen} user={editingUser} />
-      <ConfirmDialog
-        isPending={toggleUser.isPending}
-        onConfirm={() => {
-          if (userToToggle) {
-            toggleUser.mutate(userToToggle, {
-              onSuccess: () => setUserToToggle(null),
-            });
-          }
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setUserToToggle(null);
-          }
-        }}
-        open={Boolean(userToToggle)}
-        title={userToToggle?.is_active ? "Deactivate user" : "Activate user"}
-      />
+      {canManageUsers ? (
+        <>
+          <UserForm onOpenChange={setFormOpen} open={formOpen} user={editingUser} />
+          <ConfirmDialog
+            isPending={toggleUser.isPending}
+            onConfirm={() => {
+              if (userToToggle) {
+                toggleUser.mutate(userToToggle, {
+                  onSuccess: () => setUserToToggle(null),
+                });
+              }
+            }}
+            onOpenChange={(open) => {
+              if (!open) {
+                setUserToToggle(null);
+              }
+            }}
+            open={Boolean(userToToggle)}
+            title={userToToggle?.is_active ? "Deactivate user" : "Activate user"}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

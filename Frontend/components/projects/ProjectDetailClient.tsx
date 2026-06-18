@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { cn, formatDate } from "@/lib/utils";
 import type { Milestone, MilestoneCreate, Project, ProjectDocument } from "@/types/api";
 
@@ -85,6 +86,7 @@ function milestoneStats(milestones: Milestone[]) {
 
 export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
   const queryClient = useQueryClient();
+  const { canWriteProjects } = usePermissions();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -281,10 +283,12 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
               <Copy className="h-4 w-4" aria-hidden="true" />
               {copied ? "Copied" : "Copy Portal Link"}
             </Button>
-            <Button onClick={() => setEditOpen(true)} type="button">
-              <Edit className="h-4 w-4" aria-hidden="true" />
-              Edit
-            </Button>
+            {canWriteProjects ? (
+              <Button onClick={() => setEditOpen(true)} type="button">
+                <Edit className="h-4 w-4" aria-hidden="true" />
+                Edit
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -337,7 +341,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
                         ? "border-emerald-500 bg-emerald-500 text-white"
                         : "border-slate-300 bg-white text-transparent hover:border-[#2563EB] hover:text-[#2563EB]",
                     )}
-                    disabled={completed || completeMilestone.isPending}
+                    disabled={!canWriteProjects || completed || completeMilestone.isPending}
                     onClick={() => handleCompleteMilestone(milestone)}
                     type="button"
                   >
@@ -360,54 +364,62 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
                     </div>
                   </div>
 
-                  <Button
-                    aria-label="Delete milestone"
-                    disabled={deleteMilestone.isPending}
-                    onClick={() => handleDeleteMilestone(milestone)}
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
-                  </Button>
+                  {canWriteProjects ? (
+                    <Button
+                      aria-label="Delete milestone"
+                      disabled={deleteMilestone.isPending}
+                      onClick={() => handleDeleteMilestone(milestone)}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
+                    </Button>
+                  ) : null}
                 </div>
               );
             })}
           </div>
 
-          <form className="mt-5 rounded-lg border border-slate-100 bg-slate-50 p-4" onSubmit={handleAddMilestone}>
-            <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
-              <Input
-                disabled={addMilestone.isPending}
-                onChange={(event) => setNewMilestoneTitle(event.target.value)}
-                placeholder="Milestone title"
-                value={newMilestoneTitle}
-              />
-              <Input disabled={addMilestone.isPending} onChange={(event) => setNewMilestoneDueDate(event.target.value)} type="date" value={newMilestoneDueDate} />
-              <Button disabled={addMilestone.isPending} type="submit">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add Milestone
-              </Button>
-            </div>
-            {milestoneError ? <p className="mt-2 text-xs text-red-600">{milestoneError}</p> : null}
-            {addMilestone.isError ? <p className="mt-2 text-xs text-red-600">Could not add milestone.</p> : null}
-          </form>
+          {canWriteProjects ? (
+            <form className="mt-5 rounded-lg border border-slate-100 bg-slate-50 p-4" onSubmit={handleAddMilestone}>
+              <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+                <Input
+                  disabled={addMilestone.isPending}
+                  onChange={(event) => setNewMilestoneTitle(event.target.value)}
+                  placeholder="Milestone title"
+                  value={newMilestoneTitle}
+                />
+                <Input disabled={addMilestone.isPending} onChange={(event) => setNewMilestoneDueDate(event.target.value)} type="date" value={newMilestoneDueDate} />
+                <Button disabled={addMilestone.isPending} type="submit">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add Milestone
+                </Button>
+              </div>
+              {milestoneError ? <p className="mt-2 text-xs text-red-600">{milestoneError}</p> : null}
+              {addMilestone.isError ? <p className="mt-2 text-xs text-red-600">Could not add milestone.</p> : null}
+            </form>
+          ) : null}
         </section>
 
         <aside className="grid gap-4 content-start">
           <section className="rounded-xl bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-[#0F2444]">Documents</h2>
-              <Button disabled={uploadDocument.isPending} onClick={() => fileInputRef.current?.click()} size="sm" type="button" variant="outline">
-                <Upload className="h-4 w-4" aria-hidden="true" />
-                Upload
-              </Button>
-              <input
-                className="hidden"
-                onChange={(event) => handleDocumentChange(event.target.files?.[0])}
-                ref={fileInputRef}
-                type="file"
-              />
+              {canWriteProjects ? (
+                <>
+                  <Button disabled={uploadDocument.isPending} onClick={() => fileInputRef.current?.click()} size="sm" type="button" variant="outline">
+                    <Upload className="h-4 w-4" aria-hidden="true" />
+                    Upload
+                  </Button>
+                  <input
+                    className="hidden"
+                    onChange={(event) => handleDocumentChange(event.target.files?.[0])}
+                    ref={fileInputRef}
+                    type="file"
+                  />
+                </>
+              ) : null}
             </div>
 
             {uploadDocument.isPending ? (
@@ -452,9 +464,11 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
                       <Download className="h-4 w-4" aria-hidden="true" />
                       Download
                     </a>
-                    <Button disabled={deleteDocument.isPending} onClick={() => handleDeleteDocument(document)} size="sm" type="button" variant="ghost">
-                      <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
-                    </Button>
+                    {canWriteProjects ? (
+                      <Button disabled={deleteDocument.isPending} onClick={() => handleDeleteDocument(document)} size="sm" type="button" variant="ghost">
+                        <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -503,43 +517,47 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
         </aside>
       </div>
 
-      <ProjectForm onOpenChange={setEditOpen} onSaved={() => void projectQuery.refetch()} open={editOpen} project={project} />
-      <ConfirmDialog
-        confirmLabel="Confirm"
-        isPending={deleteMilestone.isPending}
-        onConfirm={() => {
-          if (milestoneToDelete) {
-            deleteMilestone.mutate(milestoneToDelete.id, {
-              onSuccess: () => setMilestoneToDelete(null),
-            });
-          }
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setMilestoneToDelete(null);
-          }
-        }}
-        open={Boolean(milestoneToDelete)}
-        title="Delete milestone"
-      />
-      <ConfirmDialog
-        confirmLabel="Confirm"
-        isPending={deleteDocument.isPending}
-        onConfirm={() => {
-          if (documentToDelete) {
-            deleteDocument.mutate(documentToDelete.id, {
-              onSuccess: () => setDocumentToDelete(null),
-            });
-          }
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDocumentToDelete(null);
-          }
-        }}
-        open={Boolean(documentToDelete)}
-        title="Delete document"
-      />
+      {canWriteProjects ? (
+        <>
+          <ProjectForm onOpenChange={setEditOpen} onSaved={() => void projectQuery.refetch()} open={editOpen} project={project} />
+          <ConfirmDialog
+            confirmLabel="Confirm"
+            isPending={deleteMilestone.isPending}
+            onConfirm={() => {
+              if (milestoneToDelete) {
+                deleteMilestone.mutate(milestoneToDelete.id, {
+                  onSuccess: () => setMilestoneToDelete(null),
+                });
+              }
+            }}
+            onOpenChange={(open) => {
+              if (!open) {
+                setMilestoneToDelete(null);
+              }
+            }}
+            open={Boolean(milestoneToDelete)}
+            title="Delete milestone"
+          />
+          <ConfirmDialog
+            confirmLabel="Confirm"
+            isPending={deleteDocument.isPending}
+            onConfirm={() => {
+              if (documentToDelete) {
+                deleteDocument.mutate(documentToDelete.id, {
+                  onSuccess: () => setDocumentToDelete(null),
+                });
+              }
+            }}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDocumentToDelete(null);
+              }
+            }}
+            open={Boolean(documentToDelete)}
+            title="Delete document"
+          />
+        </>
+      ) : null}
     </div>
   );
 }

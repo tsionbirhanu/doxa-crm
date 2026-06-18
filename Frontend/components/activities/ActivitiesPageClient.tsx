@@ -12,6 +12,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import type { Account, Activity, ActivityType, Contact, Deal, Lead, User } from "@/types/api";
 
@@ -75,6 +76,7 @@ function downloadCsv(csv: string) {
 }
 
 export function ActivitiesPageClient() {
+  const { canWriteActivities } = usePermissions();
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [filters, setFilters] = useState<ActivityFilters>({
@@ -156,7 +158,7 @@ export function ActivitiesPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "Log Activity", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteActivities ? { icon: Plus, label: "Log Activity", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Review calls, emails, meetings, and notes across linked CRM records."
         title="Activities"
       />
@@ -226,7 +228,7 @@ export function ActivitiesPageClient() {
       />
 
       {activitiesQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load activities.</div> : null}
-      <ActivityForm onOpenChange={setFormOpen} open={formOpen} />
+      {canWriteActivities ? <ActivityForm onOpenChange={setFormOpen} open={formOpen} /> : null}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { StatusPill } from "@/components/shared/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type {
   Campaign,
@@ -73,6 +74,7 @@ function variantRows(steps: CampaignSequenceStep[]) {
 
 export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) {
   const queryClient = useQueryClient();
+  const { canWriteCampaigns } = usePermissions();
   const [tab, setTab] = useState<CampaignTab>("overview");
   const [campaignFormOpen, setCampaignFormOpen] = useState(false);
   const [stepFormOpen, setStepFormOpen] = useState(false);
@@ -146,6 +148,10 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const variantComparison = useMemo(() => variantRows(steps), [steps]);
 
   function onDragEnd(result: DropResult) {
+    if (!canWriteCampaigns) {
+      return;
+    }
+
     if (!result.destination || result.destination.index === result.source.index) {
       return;
     }
@@ -193,9 +199,11 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               {formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}
             </p>
           </div>
-          <Button onClick={() => setCampaignFormOpen(true)} type="button" variant="outline">
-            Edit Campaign
-          </Button>
+          {canWriteCampaigns ? (
+            <Button onClick={() => setCampaignFormOpen(true)} type="button" variant="outline">
+              Edit Campaign
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -236,22 +244,24 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                 <dd className="font-semibold text-[#0F2444]">{formatCurrency(Number(campaign.budget ?? 0))}</dd>
               </div>
             </dl>
-            <div className="mt-5">
-              {campaign.status === "active" ? (
-                <Button disabled={pauseCampaign.isPending} onClick={() => pauseCampaign.mutate()} type="button" variant="outline">
-                  <Pause className="h-4 w-4" aria-hidden="true" />
-                  Pause
-                </Button>
-              ) : (
-                <div className="inline-flex" title={!canActivate ? disabledActivationReason : undefined}>
-                  <Button disabled={!canActivate || activateCampaign.isPending} onClick={() => activateCampaign.mutate()} type="button">
-                    <Play className="h-4 w-4" aria-hidden="true" />
-                    Activate
+            {canWriteCampaigns ? (
+              <div className="mt-5">
+                {campaign.status === "active" ? (
+                  <Button disabled={pauseCampaign.isPending} onClick={() => pauseCampaign.mutate()} type="button" variant="outline">
+                    <Pause className="h-4 w-4" aria-hidden="true" />
+                    Pause
                   </Button>
-                </div>
-              )}
-              {!canActivate && campaign.status !== "active" ? <p className="mt-2 text-xs text-amber-700">{disabledActivationReason}</p> : null}
-            </div>
+                ) : (
+                  <div className="inline-flex" title={!canActivate ? disabledActivationReason : undefined}>
+                    <Button disabled={!canActivate || activateCampaign.isPending} onClick={() => activateCampaign.mutate()} type="button">
+                      <Play className="h-4 w-4" aria-hidden="true" />
+                      Activate
+                    </Button>
+                  </div>
+                )}
+                {!canActivate && campaign.status !== "active" ? <p className="mt-2 text-xs text-amber-700">{disabledActivationReason}</p> : null}
+              </div>
+            ) : null}
           </section>
 
           <section className="rounded-xl bg-white p-5 shadow-sm">
@@ -275,20 +285,22 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <h2 className="text-base font-semibold text-[#0F2444]">Email Sequence</h2>
               <p className="mt-1 text-sm text-[#64748B]">Drag steps to reorder. Reorder saves on drop.</p>
             </div>
-            <Button onClick={() => { setEditingStep(null); setStepFormOpen(true); }} type="button">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add Step
-            </Button>
+            {canWriteCampaigns ? (
+              <Button onClick={() => { setEditingStep(null); setStepFormOpen(true); }} type="button">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add Step
+              </Button>
+            ) : null}
           </div>
           <div className="mt-5">
             {stepsQuery.isLoading ? <Skeleton className="h-72 rounded-xl" /> : null}
             {!stepsQuery.isLoading && sortedSteps.length === 0 ? <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-[#64748B]">No sequence steps yet.</div> : null}
             <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="campaign-steps">
+              <Droppable droppableId="campaign-steps" isDropDisabled={!canWriteCampaigns}>
                 {(provided) => (
                   <div className="grid gap-3" ref={provided.innerRef} {...provided.droppableProps}>
                     {sortedSteps.map((step, index) => (
-                      <Draggable draggableId={step.id} index={index} key={step.id}>
+                      <Draggable draggableId={step.id} index={index} isDragDisabled={!canWriteCampaigns} key={step.id}>
                         {(draggableProvided) => {
                           const { style, ...draggableProps } = draggableProvided.draggableProps;
 
@@ -301,7 +313,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                             >
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex min-w-0 gap-3">
-                                  <button className="mt-1 text-[#64748B]" type="button" {...draggableProvided.dragHandleProps}>
+                                  <button className="mt-1 text-[#64748B]" disabled={!canWriteCampaigns} type="button" {...draggableProvided.dragHandleProps}>
                                     <GripVertical className="h-5 w-5" aria-hidden="true" />
                                   </button>
                                   <div className="min-w-0">
@@ -314,12 +326,14 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                                     <p className="mt-1 text-sm text-slate-700">{preview(step.body)}</p>
                                   </div>
                                 </div>
-                                <div className="flex gap-2">
-                                  <Button onClick={() => { setEditingStep(step); setStepFormOpen(true); }} size="sm" type="button" variant="outline">Edit</Button>
-                                  <Button disabled={deleteStep.isPending} onClick={() => deleteStep.mutate(step.id)} size="sm" type="button" variant="ghost">
-                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                  </Button>
-                                </div>
+                                {canWriteCampaigns ? (
+                                  <div className="flex gap-2">
+                                    <Button onClick={() => { setEditingStep(step); setStepFormOpen(true); }} size="sm" type="button" variant="outline">Edit</Button>
+                                    <Button disabled={deleteStep.isPending} onClick={() => deleteStep.mutate(step.id)} size="sm" type="button" variant="ghost">
+                                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                    </Button>
+                                  </div>
+                                ) : null}
                               </div>
                             </article>
                           );
@@ -342,10 +356,12 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <h2 className="text-base font-semibold text-[#0F2444]">Enrollments</h2>
               <p className="mt-1 text-sm text-[#64748B]">Contacts currently enrolled in this campaign.</p>
             </div>
-            <Button onClick={() => setContactSelectOpen(true)} type="button">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Enroll Contacts
-            </Button>
+            {canWriteCampaigns ? (
+              <Button onClick={() => setContactSelectOpen(true)} type="button">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Enroll Contacts
+              </Button>
+            ) : null}
           </div>
           <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
             {enrollments.length === 0 ? <div className="p-8 text-center text-sm text-[#64748B]">No enrolled contacts yet.</div> : null}
@@ -358,9 +374,11 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                 <span className="text-sm text-[#64748B]">Step {enrollment.step_index + 1}</span>
                 <StatusPill status={enrollment.status} type="campaign" />
                 <span className="text-sm text-[#64748B]">{formatDate(enrollment.enrolled_at)}</span>
-                <Button disabled={unenrollContact.isPending} onClick={() => unenrollContact.mutate(enrollment.contact_id)} size="sm" type="button" variant="outline">
-                  Unenroll
-                </Button>
+                {canWriteCampaigns ? (
+                  <Button disabled={unenrollContact.isPending} onClick={() => unenrollContact.mutate(enrollment.contact_id)} size="sm" type="button" variant="outline">
+                    Unenroll
+                  </Button>
+                ) : null}
               </div>
             ))}
           </div>
@@ -414,18 +432,22 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         </section>
       ) : null}
 
-      <CampaignForm campaign={campaign} onOpenChange={setCampaignFormOpen} onSaved={() => void campaignQuery.refetch()} open={campaignFormOpen} />
-      <SequenceStepForm
-        campaignId={campaign.id}
-        onOpenChange={(open) => {
-          setStepFormOpen(open);
-          if (!open) setEditingStep(null);
-        }}
-        open={stepFormOpen}
-        previousStepNumber={editingStep ? Math.max(1, editingStep.step_index) : sortedSteps.length}
-        step={editingStep}
-      />
-      <ContactSelectModal campaignId={campaign.id} onOpenChange={setContactSelectOpen} open={contactSelectOpen} />
+      {canWriteCampaigns ? (
+        <>
+          <CampaignForm campaign={campaign} onOpenChange={setCampaignFormOpen} onSaved={() => void campaignQuery.refetch()} open={campaignFormOpen} />
+          <SequenceStepForm
+            campaignId={campaign.id}
+            onOpenChange={(open) => {
+              setStepFormOpen(open);
+              if (!open) setEditingStep(null);
+            }}
+            open={stepFormOpen}
+            previousStepNumber={editingStep ? Math.max(1, editingStep.step_index) : sortedSteps.length}
+            step={editingStep}
+          />
+          <ContactSelectModal campaignId={campaign.id} onOpenChange={setContactSelectOpen} open={contactSelectOpen} />
+        </>
+      ) : null}
     </div>
   );
 }

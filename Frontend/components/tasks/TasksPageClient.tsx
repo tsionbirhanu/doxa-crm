@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { normalizeRole } from "@/lib/auth-types";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Account, Contact, Deal, Lead, Task, TaskPriority, User } from "@/types/api";
@@ -57,6 +58,7 @@ function isOverdue(task: Task): boolean {
 
 export function TasksPageClient() {
   const queryClient = useQueryClient();
+  const { canWriteTasks } = usePermissions();
   const session = authClient.useSession();
   const storedUser = useAuthStore((state) => state.user);
   const sessionUser = session.data?.user;
@@ -174,7 +176,7 @@ export function TasksPageClient() {
       },
       { cell: (task) => <StatusPill status={isOverdue(task) ? "overdue" : task.status} type="task" />, header: "Status", id: "status" },
       {
-        cell: (task) => (
+        cell: (task) => canWriteTasks ? (
           <div className="relative flex items-center gap-1">
             {completedTaskId === task.id ? <span className="task-complete-pop pointer-events-none absolute -left-1 text-emerald-600">✓</span> : null}
             <Button disabled={task.status === "completed" || completeTask.isPending} onClick={() => completeTask.mutate(task.id)} size="icon" type="button" variant="ghost">
@@ -190,12 +192,12 @@ export function TasksPageClient() {
               <span className="sr-only">Edit</span>
             </Button>
           </div>
-        ),
+        ) : null,
         header: "Actions",
         id: "actions",
       },
     ],
-    [accountMap, completeTask, completedTaskId, contactMap, dealMap, leadMap, userMap],
+    [accountMap, canWriteTasks, completeTask, completedTaskId, contactMap, dealMap, leadMap, userMap],
   );
 
   function changeTab(nextTab: TaskTab) {
@@ -206,7 +208,7 @@ export function TasksPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Task", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteTasks ? { icon: Plus, label: "New Task", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Track follow-ups, overdue work, and task assignments."
         title="Tasks"
       />
@@ -245,9 +247,13 @@ export function TasksPageClient() {
 
       {tasksQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load tasks.</div> : null}
 
-      <TaskForm onOpenChange={setFormOpen} open={formOpen} />
-      <TaskForm onOpenChange={(open) => (!open ? setEditingTask(null) : undefined)} open={Boolean(editingTask)} task={editingTask} />
-      <SnoozeModal onOpenChange={(open) => (!open ? setSnoozingTask(null) : undefined)} open={Boolean(snoozingTask)} task={snoozingTask} />
+      {canWriteTasks ? (
+        <>
+          <TaskForm onOpenChange={setFormOpen} open={formOpen} />
+          <TaskForm onOpenChange={(open) => (!open ? setEditingTask(null) : undefined)} open={Boolean(editingTask)} task={editingTask} />
+          <SnoozeModal onOpenChange={(open) => (!open ? setSnoozingTask(null) : undefined)} open={Boolean(snoozingTask)} task={snoozingTask} />
+        </>
+      ) : null}
     </div>
   );
 }

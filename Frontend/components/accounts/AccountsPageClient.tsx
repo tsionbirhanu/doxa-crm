@@ -11,6 +11,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { api } from "@/lib/api";
 import { cn, formatCurrency } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Account, AccountTier, User } from "@/types/api";
 
 const PAGE_SIZE = 20;
@@ -48,6 +49,7 @@ function toQueryParams(page: number, filters: AccountFilters) {
 }
 
 export function AccountsPageClient() {
+  const { canWriteAccounts } = usePermissions();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<AccountFilters>({ owner_id: "", tier: "" });
   const [formOpen, setFormOpen] = useState(false);
@@ -104,7 +106,7 @@ export function AccountsPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Account", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteAccounts ? { icon: Plus, label: "New Account", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Manage companies, linked contacts, and deal value."
         title="Accounts"
       />
@@ -140,7 +142,7 @@ export function AccountsPageClient() {
 
       {accounts.length === 0 && !accountsQuery.isLoading && !accountsQuery.isError ? (
         <EmptyState
-          action={{ label: "New Account", onClick: () => setFormOpen(true) }}
+          action={canWriteAccounts ? { label: "New Account", onClick: () => setFormOpen(true) } : undefined}
           description="Create the first company account or adjust your filters."
           icon={Building2}
           title="No accounts found"
@@ -165,7 +167,7 @@ export function AccountsPageClient() {
         <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load accounts.</div>
       ) : null}
 
-      <AccountForm onOpenChange={setFormOpen} open={formOpen} />
+      {canWriteAccounts ? <AccountForm onOpenChange={setFormOpen} open={formOpen} /> : null}
     </div>
   );
 }

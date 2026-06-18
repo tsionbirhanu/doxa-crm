@@ -7,7 +7,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user, get_db
+from app.auth.permissions import SALES_WRITE_ROLES
+from app.dependencies import get_current_user, get_db, require_role
 from app.models import DealStatus, User
 from app.schemas.deals import (
     DealCollaboratorCreate,
@@ -96,7 +97,7 @@ async def list_stale_deals(
 @router.post("/", response_model=DealResponse, status_code=status.HTTP_201_CREATED)
 async def create_deal(
     deal_in: DealCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealResponse:
     return await deals_service.create_deal(db, deal_in, current_user)
@@ -115,7 +116,7 @@ async def get_deal(
 async def update_deal(
     deal_id: UUID,
     deal_in: DealUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealResponse:
     return await deals_service.update_deal(db, deal_id, deal_in, current_user)
@@ -124,7 +125,7 @@ async def update_deal(
 @router.delete("/{deal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_deal(
     deal_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await deals_service.soft_delete_deal(db, deal_id, current_user)
@@ -135,7 +136,7 @@ async def delete_deal(
 async def move_deal_stage(
     deal_id: UUID,
     move_in: DealMoveStageRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealResponse:
     return await deals_service.move_deal_stage(db, deal_id, move_in, current_user)
@@ -144,7 +145,7 @@ async def move_deal_stage(
 @router.post("/{deal_id}/won", response_model=DealResponse)
 async def mark_deal_won(
     deal_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealResponse:
     return await deals_service.mark_deal_won(db, deal_id, current_user)
@@ -154,7 +155,7 @@ async def mark_deal_won(
 async def mark_deal_lost(
     deal_id: UUID,
     lost_in: DealLostRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealResponse:
     return await deals_service.mark_deal_lost(db, deal_id, lost_in, current_user)
@@ -164,7 +165,7 @@ async def mark_deal_lost(
 async def add_collaborator(
     deal_id: UUID,
     collaborator_in: DealCollaboratorCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealDetailResponse:
     return await deals_service.add_collaborator(db, deal_id, collaborator_in, current_user)
@@ -174,7 +175,7 @@ async def add_collaborator(
 async def remove_collaborator(
     deal_id: UUID,
     user_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*SALES_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DealDetailResponse:
     return await deals_service.remove_collaborator(db, deal_id, user_id, current_user)

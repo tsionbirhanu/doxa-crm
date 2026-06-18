@@ -7,6 +7,7 @@ import { Check, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { ApiErrorPayload, Task } from "@/types/api";
 
@@ -69,6 +70,7 @@ function OverdueTasksSkeleton() {
 
 export function OverdueTasksList() {
   const queryClient = useQueryClient();
+  const { canWriteTasks } = usePermissions();
   const tasksQuery = useQuery({
     queryFn: () => api.get<Task[]>("/tasks/overdue", { page_size: 5 }),
     queryKey: ["dashboard", "overdue-tasks"],
@@ -133,15 +135,17 @@ export function OverdueTasksList() {
                       {linkedEntityLabel(task)} • {task.assigned_to_name ?? `Owner ${shortId(task.owner_id)}`}
                     </p>
                   </div>
-                  <Button
-                    disabled={completeTask.isPending && completeTask.variables === task.id}
-                    onClick={() => completeTask.mutate(task.id)}
-                    size="sm"
-                    type="button"
-                  >
-                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                    Complete
-                  </Button>
+                  {canWriteTasks ? (
+                    <Button
+                      disabled={completeTask.isPending && completeTask.variables === task.id}
+                      onClick={() => completeTask.mutate(task.id)}
+                      size="sm"
+                      type="button"
+                    >
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      Complete
+                    </Button>
+                  ) : null}
                 </div>
               );
             })}

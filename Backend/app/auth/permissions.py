@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+from app.models import User, UserRoleName
+
+SUPER_ADMIN = UserRoleName.super_admin.value
+SALES_MANAGER = UserRoleName.sales_manager.value
+SALES_REP = UserRoleName.sales_rep.value
+MARKETING_MANAGER = UserRoleName.marketing_manager.value
+MARKETING_REP = UserRoleName.marketing_rep.value
+CUSTOMER_SUCCESS = UserRoleName.customer_success.value
+READ_ONLY = UserRoleName.read_only.value
+
+ADMIN_ROLES = (SUPER_ADMIN,)
+SETTINGS_ROLES = (SUPER_ADMIN, SALES_MANAGER)
+
+SALES_WRITE_ROLES = (SUPER_ADMIN, SALES_MANAGER, SALES_REP)
+LEAD_WRITE_ROLES = (SUPER_ADMIN, SALES_MANAGER, SALES_REP, MARKETING_MANAGER, MARKETING_REP)
+CONTACT_WRITE_ROLES = (
+    SUPER_ADMIN,
+    SALES_MANAGER,
+    SALES_REP,
+    MARKETING_MANAGER,
+    MARKETING_REP,
+    CUSTOMER_SUCCESS,
+)
+ACCOUNT_WRITE_ROLES = (SUPER_ADMIN, SALES_MANAGER, SALES_REP, CUSTOMER_SUCCESS)
+ACTIVITY_WRITE_ROLES = (
+    SUPER_ADMIN,
+    SALES_MANAGER,
+    SALES_REP,
+    MARKETING_MANAGER,
+    MARKETING_REP,
+    CUSTOMER_SUCCESS,
+)
+TASK_WRITE_ROLES = ACTIVITY_WRITE_ROLES
+CAMPAIGN_WRITE_ROLES = (SUPER_ADMIN, MARKETING_MANAGER, MARKETING_REP)
+PROJECT_EDITOR_ROLES = (SUPER_ADMIN, SALES_MANAGER, CUSTOMER_SUCCESS)
+PIPELINE_ADMIN_ROLES = (SUPER_ADMIN, SALES_MANAGER)
+MANAGER_ROLES = (SUPER_ADMIN, SALES_MANAGER)
+
+
+def role_value(user: User) -> str:
+    return user.role.value if hasattr(user.role, "value") else str(user.role)
+
+
+def is_manager(user: User) -> bool:
+    return role_value(user) in MANAGER_ROLES

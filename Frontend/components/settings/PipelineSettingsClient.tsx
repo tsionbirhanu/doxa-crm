@@ -12,6 +12,7 @@ import { StageRow } from "@/components/settings/StageRow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { Pipeline, PipelineStage, PipelineStageCreate, PipelineStageUpdate, PipelineUpdate } from "@/types/api";
 
@@ -37,6 +38,7 @@ function reorder<T>(items: T[], sourceIndex: number, destinationIndex: number): 
 
 export function PipelineSettingsClient() {
   const queryClient = useQueryClient();
+  const { canAdminPipeline } = usePermissions();
   const [formOpen, setFormOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -109,11 +111,19 @@ export function PipelineSettingsClient() {
   }
 
   function beginPipelineEdit(pipeline: Pipeline) {
+    if (!canAdminPipeline) {
+      return;
+    }
+
     setEditingPipelineId(pipeline.id);
     setPipelineNameDraft(pipeline.name);
   }
 
   function savePipelineName(pipeline: Pipeline) {
+    if (!canAdminPipeline) {
+      return;
+    }
+
     const nextName = pipelineNameDraft.trim();
     setEditingPipelineId(null);
     if (!nextName || nextName === pipeline.name) {
@@ -125,6 +135,10 @@ export function PipelineSettingsClient() {
   }
 
   function deletePipelineIfAllowed(pipeline: Pipeline) {
+    if (!canAdminPipeline) {
+      return;
+    }
+
     if (pipeline.is_default) {
       return;
     }
@@ -133,11 +147,19 @@ export function PipelineSettingsClient() {
   }
 
   function showAddStage(pipelineId: string) {
+    if (!canAdminPipeline) {
+      return;
+    }
+
     setAddingPipelineId(pipelineId);
     setAddDraft({ name: "", probability: "10" });
   }
 
   function saveNewStage(pipeline: Pipeline) {
+    if (!canAdminPipeline) {
+      return;
+    }
+
     const probability = Number(addDraft.probability);
     if (!addDraft.name.trim() || Number.isNaN(probability) || probability < 0 || probability > 100) {
       return;
@@ -154,6 +176,10 @@ export function PipelineSettingsClient() {
   }
 
   function onDragEnd(result: DropResult) {
+    if (!canAdminPipeline) {
+      return;
+    }
+
     if (!result.destination) {
       return;
     }
@@ -186,7 +212,7 @@ export function PipelineSettingsClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Pipeline", onClick: () => setFormOpen(true) }}
+        primaryAction={canAdminPipeline ? { icon: Plus, label: "New Pipeline", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Configure sales pipelines, stage probabilities, and stage order."
         title="Pipeline Settings"
       />
@@ -241,31 +267,35 @@ export function PipelineSettingsClient() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => beginPipelineEdit(pipeline)} size="sm" type="button" variant="outline">
-                      <Pencil className="h-4 w-4" aria-hidden="true" />
-                      Edit Name
-                    </Button>
-                    <Button
-                      disabled={pipeline.is_default || deletePipeline.isPending}
-                      onClick={() => deletePipelineIfAllowed(pipeline)}
-                      size="sm"
-                      title={pipeline.is_default ? "Default pipeline cannot be deleted." : "Delete pipeline"}
-                      type="button"
-                      variant="outline"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
-                      Delete
-                    </Button>
+                    {canAdminPipeline ? (
+                      <>
+                        <Button onClick={() => beginPipelineEdit(pipeline)} size="sm" type="button" variant="outline">
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                          Edit Name
+                        </Button>
+                        <Button
+                          disabled={pipeline.is_default || deletePipeline.isPending}
+                          onClick={() => deletePipelineIfAllowed(pipeline)}
+                          size="sm"
+                          title={pipeline.is_default ? "Default pipeline cannot be deleted." : "Delete pipeline"}
+                          type="button"
+                          variant="outline"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
+                          Delete
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 </header>
 
                 {isExpanded ? (
                   <div className="grid gap-3 p-4">
-                    <Droppable droppableId={pipeline.id}>
+                    <Droppable droppableId={pipeline.id} isDropDisabled={!canAdminPipeline}>
                       {(provided) => (
                         <div className="grid gap-3" ref={provided.innerRef} {...provided.droppableProps}>
                           {pipeline.stages.map((stage, index) => (
-                            <Draggable draggableId={stage.id} index={index} key={stage.id}>
+                            <Draggable draggableId={stage.id} index={index} isDragDisabled={!canAdminPipeline} key={stage.id}>
                               {(draggableProvided, snapshot) => {
                                 const { style, ...draggableProps } = draggableProvided.draggableProps;
 
@@ -276,7 +306,7 @@ export function PipelineSettingsClient() {
                                     style={style as CSSProperties | undefined}
                                     {...draggableProps}
                                   >
-                                    <StageRow dragHandleProps={draggableProvided.dragHandleProps} pipelineId={pipeline.id} stage={stage} />
+                                    <StageRow canEdit={canAdminPipeline} dragHandleProps={draggableProvided.dragHandleProps} pipelineId={pipeline.id} stage={stage} />
                                   </div>
                                 );
                               }}
@@ -287,7 +317,7 @@ export function PipelineSettingsClient() {
                       )}
                     </Droppable>
 
-                    {addingPipelineId === pipeline.id ? (
+                    {canAdminPipeline && addingPipelineId === pipeline.id ? (
                       <div className="grid gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_140px_auto_auto]">
                         <Input
                           aria-label="New stage name"
@@ -311,12 +341,12 @@ export function PipelineSettingsClient() {
                           Cancel
                         </Button>
                       </div>
-                    ) : (
+                    ) : canAdminPipeline ? (
                       <Button className="justify-self-start" onClick={() => showAddStage(pipeline.id)} type="button" variant="outline">
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Add Stage
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 ) : null}
               </section>
@@ -325,24 +355,28 @@ export function PipelineSettingsClient() {
         </div>
       </DragDropContext>
 
-      <PipelineForm onOpenChange={setFormOpen} open={formOpen} />
-      <ConfirmDialog
-        isPending={deletePipeline.isPending}
-        onConfirm={() => {
-          if (pipelineToDelete) {
-            deletePipeline.mutate(pipelineToDelete.id, {
-              onSuccess: () => setPipelineToDelete(null),
-            });
-          }
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPipelineToDelete(null);
-          }
-        }}
-        open={Boolean(pipelineToDelete)}
-        title="Delete pipeline"
-      />
+      {canAdminPipeline ? (
+        <>
+          <PipelineForm onOpenChange={setFormOpen} open={formOpen} />
+          <ConfirmDialog
+            isPending={deletePipeline.isPending}
+            onConfirm={() => {
+              if (pipelineToDelete) {
+                deletePipeline.mutate(pipelineToDelete.id, {
+                  onSuccess: () => setPipelineToDelete(null),
+                });
+              }
+            }}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPipelineToDelete(null);
+              }
+            }}
+            open={Boolean(pipelineToDelete)}
+            title="Delete pipeline"
+          />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Account, Contact, User } from "@/types/api";
 
 const PAGE_SIZE = 20;
@@ -58,6 +59,7 @@ function toQueryParams(page: number, filters: ContactFilters) {
 
 export function ContactsPageClient() {
   const queryClient = useQueryClient();
+  const { canWriteContacts } = usePermissions();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<ContactFilters>({
     account_id: "",
@@ -120,25 +122,26 @@ export function ContactsPageClient() {
       { cell: (contact) => contact.owner_name ?? contact.owner_id.slice(0, 8), header: "Owner", id: "owner" },
       { cell: (contact) => formatDate(contact.created_at), header: "Created", id: "created" },
       {
-        cell: (contact) => (
-          <Button
-            onClick={(event) => {
-              event.preventDefault();
-              setArchiveContact(contact);
-            }}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            <Archive className="h-4 w-4" aria-hidden="true" />
-            Archive
-          </Button>
-        ),
+        cell: (contact) =>
+          canWriteContacts ? (
+            <Button
+              onClick={(event) => {
+                event.preventDefault();
+                setArchiveContact(contact);
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <Archive className="h-4 w-4" aria-hidden="true" />
+              Archive
+            </Button>
+          ) : null,
         header: "",
         id: "actions",
       },
     ],
-    [],
+    [canWriteContacts],
   );
 
   function updateFilter(key: keyof ContactFilters, value: string) {
@@ -149,7 +152,7 @@ export function ContactsPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Contact", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteContacts ? { icon: Plus, label: "New Contact", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Manage people, ownership, tags, and account relationships."
         title="Contacts"
       />
@@ -195,7 +198,7 @@ export function ContactsPageClient() {
 
       {contacts.length === 0 && !contactsQuery.isLoading && !contactsQuery.isError ? (
         <EmptyState
-          action={{ label: "New Contact", onClick: () => setFormOpen(true) }}
+          action={canWriteContacts ? { label: "New Contact", onClick: () => setFormOpen(true) } : undefined}
           description="Create the first contact or adjust your filters."
           icon={Users}
           title="No contacts found"
@@ -220,24 +223,26 @@ export function ContactsPageClient() {
         <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load contacts.</div>
       ) : null}
 
-      <ContactForm onOpenChange={setFormOpen} open={formOpen} />
+      {canWriteContacts ? <ContactForm onOpenChange={setFormOpen} open={formOpen} /> : null}
 
-      <ConfirmDialog
-        confirmLabel="Confirm"
-        isPending={archiveMutation.isPending}
-        onConfirm={() => {
-          if (archiveContact) {
-            archiveMutation.mutate(archiveContact.id);
-          }
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setArchiveContact(null);
-          }
-        }}
-        open={Boolean(archiveContact)}
-        title="Archive contact"
-      />
+      {canWriteContacts ? (
+        <ConfirmDialog
+          confirmLabel="Confirm"
+          isPending={archiveMutation.isPending}
+          onConfirm={() => {
+            if (archiveContact) {
+              archiveMutation.mutate(archiveContact.id);
+            }
+          }}
+          onOpenChange={(open) => {
+            if (!open) {
+              setArchiveContact(null);
+            }
+          }}
+          open={Boolean(archiveContact)}
+          title="Archive contact"
+        />
+      ) : null}
     </div>
   );
 }

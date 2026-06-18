@@ -12,12 +12,13 @@ import { api } from "@/lib/api";
 import type { Deal, PipelineStage, PipelineStageUpdate } from "@/types/api";
 
 interface StageRowProps {
+  canEdit?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
   pipelineId: string;
   stage: PipelineStage;
 }
 
-export function StageRow({ dragHandleProps, pipelineId, stage }: StageRowProps) {
+export function StageRow({ canEdit = true, dragHandleProps, pipelineId, stage }: StageRowProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(stage.name);
   const [probability, setProbability] = useState(String(Math.round(stage.probability)));
@@ -44,6 +45,10 @@ export function StageRow({ dragHandleProps, pipelineId, stage }: StageRowProps) 
   });
 
   function saveIfChanged() {
+    if (!canEdit) {
+      return;
+    }
+
     const nextProbability = Number(probability);
     if (!name.trim() || Number.isNaN(nextProbability) || nextProbability < 0 || nextProbability > 100) {
       setName(stage.name);
@@ -74,13 +79,14 @@ export function StageRow({ dragHandleProps, pipelineId, stage }: StageRowProps) 
         aria-label="Drag stage"
         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748B] hover:bg-slate-100"
         type="button"
+        disabled={!canEdit}
         {...dragHandleProps}
       >
         <GripVertical className="h-4 w-4" aria-hidden="true" />
       </button>
       <Input
         aria-label="Stage name"
-        disabled={updateStage.isPending}
+        disabled={!canEdit || updateStage.isPending}
         onBlur={saveIfChanged}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {
@@ -93,7 +99,7 @@ export function StageRow({ dragHandleProps, pipelineId, stage }: StageRowProps) 
       <div className="relative">
         <Input
           aria-label="Probability percentage"
-          disabled={updateStage.isPending}
+          disabled={!canEdit || updateStage.isPending}
           max="100"
           min="0"
           onBlur={saveIfChanged}
@@ -104,7 +110,7 @@ export function StageRow({ dragHandleProps, pipelineId, stage }: StageRowProps) 
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#64748B]">%</span>
       </div>
       <Button
-        disabled={deleteDisabled}
+        disabled={!canEdit || deleteDisabled}
         onClick={() => setConfirmDeleteOpen(true)}
         size="icon"
         title={hasDeals ? "Stage contains deals and cannot be deleted." : usageQuery.isLoading ? "Checking stage usage..." : "Delete stage"}

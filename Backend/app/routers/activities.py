@@ -7,7 +7,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user, get_db
+from app.auth.permissions import ACTIVITY_WRITE_ROLES, is_manager
+from app.dependencies import get_current_user, get_db, require_role
 from app.models import ActivityType, User
 from app.schemas.activities import ActivityCreate, ActivityResponse, ActivityUpdate, EmailLogCreate
 from app.services import activities as activities_service
@@ -30,6 +31,9 @@ async def list_activities(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> list[ActivityResponse]:
+    if not is_manager(current_user):
+        owner_id = current_user.id
+
     return await activities_service.list_activities(
         db,
         page=page,
@@ -48,7 +52,7 @@ async def list_activities(
 @router.post("/", response_model=ActivityResponse, status_code=status.HTTP_201_CREATED)
 async def create_activity(
     activity_in: ActivityCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACTIVITY_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ActivityResponse:
     return await activities_service.create_activity(db, activity_in, current_user)
@@ -57,7 +61,7 @@ async def create_activity(
 @router.post("/email-log", response_model=ActivityResponse, status_code=status.HTTP_201_CREATED)
 async def log_email_activity(
     email_in: EmailLogCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACTIVITY_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ActivityResponse:
     return await activities_service.log_email_activity(db, email_in, current_user)
@@ -76,7 +80,7 @@ async def get_activity(
 async def update_activity(
     activity_id: UUID,
     activity_in: ActivityUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACTIVITY_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ActivityResponse:
     return await activities_service.update_activity(db, activity_id, activity_in)
@@ -85,7 +89,7 @@ async def update_activity(
 @router.delete("/{activity_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_activity(
     activity_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACTIVITY_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await activities_service.delete_activity(db, activity_id)

@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/shared/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/lib/permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Campaign, CampaignStatus, CampaignType } from "@/types/api";
 
@@ -29,6 +30,7 @@ function typePill(type: CampaignType) {
 }
 
 export function CampaignsPageClient() {
+  const { canWriteCampaigns } = usePermissions();
   const [formOpen, setFormOpen] = useState(false);
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
@@ -46,7 +48,7 @@ export function CampaignsPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Campaign", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteCampaigns ? { icon: Plus, label: "New Campaign", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Build email sequences, enroll contacts, and track performance."
         title="Campaigns"
       />
@@ -127,7 +129,7 @@ export function CampaignsPageClient() {
       </div>
 
       {campaignsQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load campaigns.</div> : null}
-      <CampaignForm onOpenChange={setFormOpen} open={formOpen} />
+      {canWriteCampaigns ? <CampaignForm onOpenChange={setFormOpen} open={formOpen} /> : null}
     </div>
   );
 }

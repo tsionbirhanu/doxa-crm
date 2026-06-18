@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Account, AccountDeal, Activity as ActivityRecord, Contact } from "@/types/api";
 
 type AccountTab = "contacts" | "deals" | "activity";
@@ -45,6 +46,7 @@ function addressLines(account: Account): string[] {
 }
 
 export function AccountDetailClient({ accountId }: AccountDetailClientProps) {
+  const { canWriteAccounts } = usePermissions();
   const [tab, setTab] = useState<AccountTab>("contacts");
   const [editOpen, setEditOpen] = useState(false);
 
@@ -142,10 +144,12 @@ export function AccountDetailClient({ accountId }: AccountDetailClientProps) {
               {account.website}
             </a>
           </div>
-          <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
-            <Edit className="h-4 w-4" aria-hidden="true" />
-            Edit
-          </Button>
+          {canWriteAccounts ? (
+            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+              <Edit className="h-4 w-4" aria-hidden="true" />
+              Edit
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -258,7 +262,7 @@ export function AccountDetailClient({ accountId }: AccountDetailClientProps) {
         </aside>
       </div>
 
-      <AccountForm account={account} onOpenChange={setEditOpen} onSaved={() => void accountQuery.refetch()} open={editOpen} />
+      {canWriteAccounts ? <AccountForm account={account} onOpenChange={setEditOpen} onSaved={() => void accountQuery.refetch()} open={editOpen} /> : null}
     </div>
   );
 }

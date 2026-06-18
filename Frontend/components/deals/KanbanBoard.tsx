@@ -13,6 +13,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type { Deal, DealMoveStageRequest, DealSummary, KanbanStage } from "@/types/api";
 
 interface KanbanBoardProps {
+  canDrag?: boolean;
   detailsById?: Map<string, Deal>;
   stages: KanbanStage[];
 }
@@ -65,7 +66,7 @@ function moveDeal(columns: KanbanStage[], sourceStageId: string, destinationStag
   return nextColumns;
 }
 
-export function KanbanBoard({ detailsById, stages }: KanbanBoardProps) {
+export function KanbanBoard({ canDrag = true, detailsById, stages }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [columns, setColumns] = useState<KanbanStage[]>(stages);
   const [pendingLostMove, setPendingLostMove] = useState<PendingLostMove | null>(null);
@@ -88,6 +89,10 @@ export function KanbanBoard({ detailsById, stages }: KanbanBoardProps) {
   });
 
   function onDragEnd(result: DropResult) {
+    if (!canDrag) {
+      return;
+    }
+
     const { destination, draggableId, source } = result;
 
     if (!destination) {
@@ -180,7 +185,7 @@ export function KanbanBoard({ detailsById, stages }: KanbanBoardProps) {
                   {wonStage && stage.deals.length > 0 ? <p className="mt-2 text-xs font-medium text-emerald-700">Won momentum</p> : null}
                 </header>
 
-                <Droppable droppableId={stage.stage_id}>
+                <Droppable droppableId={stage.stage_id} isDropDisabled={!canDrag}>
                   {(provided, snapshot) => (
                     <div
                       className={cn("flex flex-1 flex-col gap-3 p-3 transition-colors", snapshot.isDraggingOver && "bg-blue-50")}
@@ -188,7 +193,7 @@ export function KanbanBoard({ detailsById, stages }: KanbanBoardProps) {
                       {...provided.droppableProps}
                     >
                       {stage.deals.map((deal: DealSummary, index) => (
-                        <Draggable draggableId={deal.id} index={index} key={deal.id}>
+                        <Draggable draggableId={deal.id} index={index} isDragDisabled={!canDrag} key={deal.id}>
                           {(draggableProvided, draggableSnapshot) => {
                             const { style, ...draggableProps } = draggableProvided.draggableProps;
 

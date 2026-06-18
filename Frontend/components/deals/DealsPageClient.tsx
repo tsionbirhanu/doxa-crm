@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Deal, DealForecastResponse, DealKanbanResponse, Pipeline } from "@/types/api";
 
 type ViewMode = "kanban" | "list";
@@ -27,6 +28,7 @@ function toNumber(value: number | string): number {
 }
 
 export function DealsPageClient() {
+  const { canWriteDeals } = usePermissions();
   const [selectedPipelineId, setSelectedPipelineId] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [formOpen, setFormOpen] = useState(false);
@@ -95,7 +97,7 @@ export function DealsPageClient() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Deal", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteDeals ? { icon: Plus, label: "New Deal", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Manage pipeline stages, forecast, and opportunity movement."
         title="Sales Pipeline"
       />
@@ -168,7 +170,7 @@ export function DealsPageClient() {
         ) : kanbanQuery.isError ? (
           <div className="rounded-xl border border-red-100 bg-white p-5 text-sm text-red-700 shadow-sm">Could not load Kanban board.</div>
         ) : (
-          <KanbanBoard detailsById={detailsById} stages={kanbanQuery.data?.stages ?? []} />
+          <KanbanBoard canDrag={canWriteDeals} detailsById={detailsById} stages={kanbanQuery.data?.stages ?? []} />
         )
       ) : (
         <DataTable
@@ -180,7 +182,7 @@ export function DealsPageClient() {
         />
       )}
 
-      <DealForm onOpenChange={setFormOpen} open={formOpen} selectedPipelineId={selectedPipelineId} />
+      {canWriteDeals ? <DealForm onOpenChange={setFormOpen} open={formOpen} selectedPipelineId={selectedPipelineId} /> : null}
     </div>
   );
 }

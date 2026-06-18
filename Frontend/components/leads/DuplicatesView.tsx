@@ -37,7 +37,11 @@ function LeadCard({ lead, title }: { lead?: Lead; title: string }) {
   );
 }
 
-export function DuplicatesView() {
+interface DuplicatesViewProps {
+  canWriteLeads?: boolean;
+}
+
+export function DuplicatesView({ canWriteLeads = true }: DuplicatesViewProps) {
   const queryClient = useQueryClient();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const duplicatesQuery = useQuery({
@@ -93,20 +97,22 @@ export function DuplicatesView() {
                 <p className="mt-1 text-sm text-[#64748B]">{pair.reason}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  disabled={mergeMutation.isPending}
-                  onClick={() =>
-                    mergeMutation.mutate({
-                      duplicate_lead_id: pair.duplicate_lead_id,
-                      primary_lead_id: pair.lead_id,
-                    })
-                  }
-                  size="sm"
-                  type="button"
-                >
-                  <GitMerge className="h-4 w-4" aria-hidden="true" />
-                  Keep Primary
-                </Button>
+                {canWriteLeads ? (
+                  <Button
+                    disabled={mergeMutation.isPending}
+                    onClick={() =>
+                      mergeMutation.mutate({
+                        duplicate_lead_id: pair.duplicate_lead_id,
+                        primary_lead_id: pair.lead_id,
+                      })
+                    }
+                    size="sm"
+                    type="button"
+                  >
+                    <GitMerge className="h-4 w-4" aria-hidden="true" />
+                    Keep Primary
+                  </Button>
+                ) : null}
                 <Button onClick={() => setDismissed((current) => new Set([...current, key]))} size="sm" type="button" variant="outline">
                   <X className="h-4 w-4" aria-hidden="true" />
                   Not Duplicate

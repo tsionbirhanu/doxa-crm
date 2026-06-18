@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { DuplicateLeadPair, Lead, LeadSource, LeadStatus, User } from "@/types/api";
 
 const PAGE_SIZE = 20;
@@ -62,6 +63,7 @@ function toQueryParams(page: number, filters: LeadFilters) {
 
 export function LeadsPageClient({ view }: LeadsPageClientProps) {
   const queryClient = useQueryClient();
+  const { canWriteLeads } = usePermissions();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<LeadFilters>({
     assigned_to: "",
@@ -107,49 +109,53 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
 
   const columns = useMemo<Array<DataTableColumn<Lead>>>(
     () => [
-      {
-        cell: (lead) => (
-          <input
-            aria-label={`Select ${lead.full_name}`}
-            checked={selectedIds.has(lead.id)}
-            className="h-4 w-4 rounded border-slate-300"
-            onChange={(event) => {
-              setSelectedIds((current) => {
-                const next = new Set(current);
-                if (event.target.checked) {
-                  next.add(lead.id);
-                } else {
-                  next.delete(lead.id);
-                }
-                return next;
-              });
-            }}
-            type="checkbox"
-          />
-        ),
-        header: (
-          <input
-            aria-label="Select all leads on page"
-            checked={allPageSelected}
-            className="h-4 w-4 rounded border-slate-300"
-            onChange={(event) => {
-              setSelectedIds((current) => {
-                const next = new Set(current);
-                leads.forEach((lead) => {
-                  if (event.target.checked) {
-                    next.add(lead.id);
-                  } else {
-                    next.delete(lead.id);
-                  }
-                });
-                return next;
-              });
-            }}
-            type="checkbox"
-          />
-        ),
-        id: "select",
-      },
+      ...(canWriteLeads
+        ? [
+            {
+              cell: (lead: Lead) => (
+                <input
+                  aria-label={`Select ${lead.full_name}`}
+                  checked={selectedIds.has(lead.id)}
+                  className="h-4 w-4 rounded border-slate-300"
+                  onChange={(event) => {
+                    setSelectedIds((current) => {
+                      const next = new Set(current);
+                      if (event.target.checked) {
+                        next.add(lead.id);
+                      } else {
+                        next.delete(lead.id);
+                      }
+                      return next;
+                    });
+                  }}
+                  type="checkbox"
+                />
+              ),
+              header: (
+                <input
+                  aria-label="Select all leads on page"
+                  checked={allPageSelected}
+                  className="h-4 w-4 rounded border-slate-300"
+                  onChange={(event) => {
+                    setSelectedIds((current) => {
+                      const next = new Set(current);
+                      leads.forEach((lead) => {
+                        if (event.target.checked) {
+                          next.add(lead.id);
+                        } else {
+                          next.delete(lead.id);
+                        }
+                      });
+                      return next;
+                    });
+                  }}
+                  type="checkbox"
+                />
+              ),
+              id: "select",
+            },
+          ]
+        : []),
       {
         cell: (lead) => (
           <Link className="font-semibold text-[#0F2444] hover:text-[#2563EB]" href={`/leads/${lead.id}`}>
@@ -166,17 +172,21 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
       { cell: (lead) => <StatusPill status={lead.status} type="lead" />, header: "Status", id: "status" },
       { cell: (lead) => lead.assigned_to_name ?? lead.assigned_to.slice(0, 8), header: "Assigned To", id: "assigned" },
       { cell: (lead) => formatDate(lead.created_at), header: "Created", id: "created" },
-      {
-        cell: (lead) => (
-          <Button disabled={lead.status === "converted"} onClick={() => setConvertLead(lead)} size="sm" type="button" variant="outline">
-            Convert
-          </Button>
-        ),
-        header: "",
-        id: "actions",
-      },
+      ...(canWriteLeads
+        ? [
+            {
+              cell: (lead: Lead) => (
+                <Button disabled={lead.status === "converted"} onClick={() => setConvertLead(lead)} size="sm" type="button" variant="outline">
+                  Convert
+                </Button>
+              ),
+              header: "",
+              id: "actions",
+            },
+          ]
+        : []),
     ],
-    [allPageSelected, leads, selectedIds],
+    [allPageSelected, canWriteLeads, leads, selectedIds],
   );
 
   function updateFilter(key: keyof LeadFilters, value: string) {
@@ -188,21 +198,23 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
   return (
     <div className="grid gap-6">
       <PageHeader
-        primaryAction={{ icon: Plus, label: "New Lead", onClick: () => setFormOpen(true) }}
+        primaryAction={canWriteLeads ? { icon: Plus, label: "New Lead", onClick: () => setFormOpen(true) } : undefined}
         subtitle="Capture, score, assign, import, deduplicate, and convert leads."
         title="Leads"
       />
 
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={() => setFormOpen(true)} type="button">
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          New Lead
-        </Button>
-        <Button onClick={() => setImportOpen(true)} type="button" variant="outline">
-          <FileUp className="h-4 w-4" aria-hidden="true" />
-          Import CSV
-        </Button>
-      </div>
+      {canWriteLeads ? (
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => setImportOpen(true)} type="button" variant="outline">
+            <FileUp className="h-4 w-4" aria-hidden="true" />
+            Import CSV
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#64748B] shadow-sm">
+          You have read-only access. You can view leads, but cannot create, edit, delete, assign, score, import, merge, or convert them.
+        </div>
+      )}
 
       {duplicateCount > 0 && !duplicateView ? (
         <Link
@@ -214,7 +226,7 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
       ) : null}
 
       {duplicateView ? (
-        <DuplicatesView />
+        <DuplicatesView canWriteLeads={canWriteLeads} />
       ) : (
         <>
           <section className="rounded-xl bg-white p-4 shadow-sm">
@@ -278,7 +290,7 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
             </div>
           </section>
 
-          {selectedIds.size > 0 ? (
+          {canWriteLeads && selectedIds.size > 0 ? (
             <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-sm">
               <p className="text-sm font-medium text-[#0F2444]">{selectedIds.size} selected</p>
               <div className="flex gap-2">
@@ -320,26 +332,30 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
         </>
       )}
 
-      <LeadForm onOpenChange={setFormOpen} open={formOpen} />
-      <ImportModal onOpenChange={setImportOpen} open={importOpen} />
-      {convertLead ? <ConvertModal lead={convertLead} onOpenChange={(open) => (!open ? setConvertLead(null) : undefined)} open={Boolean(convertLead)} /> : null}
-      <AssignLeadDialog
-        leadIds={Array.from(selectedIds)}
-        onAssigned={() => setSelectedIds(new Set())}
-        onOpenChange={setAssignOpen}
-        open={assignOpen}
-      />
-      <ConfirmDialog
-        isPending={deleteMutation.isPending}
-        onConfirm={() =>
-          deleteMutation.mutate(Array.from(selectedIds), {
-            onSuccess: () => setConfirmDeleteOpen(false),
-          })
-        }
-        onOpenChange={setConfirmDeleteOpen}
-        open={confirmDeleteOpen}
-        title="Delete selected leads"
-      />
+      {canWriteLeads ? (
+        <>
+          <LeadForm onOpenChange={setFormOpen} open={formOpen} />
+          <ImportModal onOpenChange={setImportOpen} open={importOpen} />
+          {convertLead ? <ConvertModal lead={convertLead} onOpenChange={(open) => (!open ? setConvertLead(null) : undefined)} open={Boolean(convertLead)} /> : null}
+          <AssignLeadDialog
+            leadIds={Array.from(selectedIds)}
+            onAssigned={() => setSelectedIds(new Set())}
+            onOpenChange={setAssignOpen}
+            open={assignOpen}
+          />
+          <ConfirmDialog
+            isPending={deleteMutation.isPending}
+            onConfirm={() =>
+              deleteMutation.mutate(Array.from(selectedIds), {
+                onSuccess: () => setConfirmDeleteOpen(false),
+              })
+            }
+            onOpenChange={setConfirmDeleteOpen}
+            open={confirmDeleteOpen}
+            title="Delete selected leads"
+          />
+        </>
+      ) : null}
     </div>
   );
 }

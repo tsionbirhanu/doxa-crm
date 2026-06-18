@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.permissions import PROJECT_EDITOR_ROLES
 from app.dependencies import get_current_user, get_db, require_role
 from app.models import ProjectHealth, User
 from app.schemas.projects import (
@@ -20,9 +21,6 @@ from app.schemas.projects import (
 )
 from app.middleware.rate_limit import PUBLIC_PORTAL_RATE_LIMIT, limiter
 from app.services import projects as projects_service
-
-
-PROJECT_EDITOR_ROLES = ("customer_success", "sales_manager", "super_admin")
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 portal_router = APIRouter(prefix="/portal", tags=["Customer Portal"])

@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user, get_db
+from app.auth.permissions import TASK_WRITE_ROLES, is_manager
+from app.dependencies import get_current_user, get_db, require_role
 from app.models import TaskStatus, User
 from app.schemas.activities import TaskCreate, TaskResponse, TaskSnoozeRequest, TaskUpdate
 from app.services import tasks as tasks_service
@@ -28,6 +29,9 @@ async def list_tasks(
     deal_id: UUID | None = None,
     account_id: UUID | None = None,
 ) -> list[TaskResponse]:
+    if not is_manager(current_user):
+        owner_id = current_user.id
+
     return await tasks_service.list_tasks(
         db,
         page=page,
@@ -50,13 +54,16 @@ async def list_overdue_tasks(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     owner_id: UUID | None = None,
 ) -> list[TaskResponse]:
+    if not is_manager(current_user):
+        owner_id = current_user.id
+
     return await tasks_service.list_overdue_tasks(db, page=page, page_size=page_size, owner_id=owner_id)
 
 
 @router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     task_in: TaskCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*TASK_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TaskResponse:
     return await tasks_service.create_task(db, task_in, current_user)
@@ -75,7 +82,7 @@ async def get_task(
 async def update_task(
     task_id: UUID,
     task_in: TaskUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*TASK_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TaskResponse:
     return await tasks_service.update_task(db, task_id, task_in)
@@ -84,7 +91,7 @@ async def update_task(
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
     task_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*TASK_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await tasks_service.delete_task(db, task_id)
@@ -94,7 +101,7 @@ async def delete_task(
 @router.post("/{task_id}/complete", response_model=TaskResponse)
 async def complete_task(
     task_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*TASK_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TaskResponse:
     return await tasks_service.complete_task(db, task_id)
@@ -104,7 +111,7 @@ async def complete_task(
 async def snooze_task(
     task_id: UUID,
     snooze_in: TaskSnoozeRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*TASK_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TaskResponse:
     return await tasks_service.snooze_task(db, task_id, snooze_in)

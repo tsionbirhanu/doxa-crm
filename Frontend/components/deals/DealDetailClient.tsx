@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, formatCurrency, formatDate, getInitials } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Deal, DealDetailResponse, DealLostRequest, Pipeline, Project } from "@/types/api";
 
 interface DealDetailClientProps {
@@ -48,6 +49,7 @@ function activityIcon(type: string) {
 export function DealDetailClient({ dealId }: DealDetailClientProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { canWriteActivities, canWriteDeals, canWriteProjects } = usePermissions();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -144,28 +146,34 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={deal.status !== "won" || createProject.isPending}
-              onClick={() => createProject.mutate()}
-              title={deal.status !== "won" ? "Only closed-won deals can become projects." : undefined}
-              type="button"
-              variant="outline"
-            >
-              <FolderKanban className="h-4 w-4" aria-hidden="true" />
-              Create Project
-            </Button>
-            <Button disabled={deal.status === "won" || markWon.isPending} onClick={() => markWon.mutate()} type="button">
-              <Trophy className="h-4 w-4" aria-hidden="true" />
-              Mark Won
-            </Button>
-            <Button disabled={deal.status === "lost"} onClick={() => setLostOpen(true)} type="button" variant="destructive">
-              <XCircle className="h-4 w-4" aria-hidden="true" />
-              Mark Lost
-            </Button>
-            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
-              <Edit className="h-4 w-4" aria-hidden="true" />
-              Edit Deal
-            </Button>
+            {canWriteProjects ? (
+              <Button
+                disabled={deal.status !== "won" || createProject.isPending}
+                onClick={() => createProject.mutate()}
+                title={deal.status !== "won" ? "Only closed-won deals can become projects." : undefined}
+                type="button"
+                variant="outline"
+              >
+                <FolderKanban className="h-4 w-4" aria-hidden="true" />
+                Create Project
+              </Button>
+            ) : null}
+            {canWriteDeals ? (
+              <>
+                <Button disabled={deal.status === "won" || markWon.isPending} onClick={() => markWon.mutate()} type="button">
+                  <Trophy className="h-4 w-4" aria-hidden="true" />
+                  Mark Won
+                </Button>
+                <Button disabled={deal.status === "lost"} onClick={() => setLostOpen(true)} type="button" variant="destructive">
+                  <XCircle className="h-4 w-4" aria-hidden="true" />
+                  Mark Lost
+                </Button>
+                <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+                  <Edit className="h-4 w-4" aria-hidden="true" />
+                  Edit Deal
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -197,10 +205,12 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
               <h2 className="text-base font-semibold text-[#0F2444]">Activity Timeline</h2>
               <p className="mt-1 text-sm text-[#64748B]">Calls, emails, meetings, and notes.</p>
             </div>
-            <Button onClick={() => setActivityOpen(true)} type="button" variant="outline">
-              <Activity className="h-4 w-4" aria-hidden="true" />
-              Log Activity
-            </Button>
+            {canWriteActivities ? (
+              <Button onClick={() => setActivityOpen(true)} type="button" variant="outline">
+                <Activity className="h-4 w-4" aria-hidden="true" />
+                Log Activity
+              </Button>
+            ) : null}
           </div>
           <div className="mt-5 space-y-4">
             <ActivityTimeline items={timelineItems} />
@@ -247,10 +257,12 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
           <section className="rounded-xl bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-[#0F2444]">Collaborators</h2>
-              <Button onClick={() => setCollaboratorOpen(true)} size="sm" type="button" variant="outline">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add
-              </Button>
+              {canWriteDeals ? (
+                <Button onClick={() => setCollaboratorOpen(true)} size="sm" type="button" variant="outline">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add
+                </Button>
+              ) : null}
             </div>
             <div className="mt-4 grid gap-3">
               {deal.collaborators.length === 0 ? <p className="text-sm text-[#64748B]">No collaborators yet.</p> : null}
@@ -292,15 +304,21 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
         </aside>
       </div>
 
-      <LostReasonModal isPending={markLost.isPending} onCancel={() => setLostOpen(false)} onConfirm={(reason) => markLost.mutate(reason)} open={lostOpen} />
-      <ActivityForm
-        initialLink={{ id: deal.id, label: deal.title, type: "deal" }}
-        onOpenChange={setActivityOpen}
-        onSaved={() => void dealQuery.refetch()}
-        open={activityOpen}
-      />
-      <DealForm deal={deal} onOpenChange={setEditOpen} onSaved={() => void dealQuery.refetch()} open={editOpen} selectedPipelineId={deal.pipeline_id} />
-      <AddCollaboratorDialog dealId={deal.id} onOpenChange={setCollaboratorOpen} open={collaboratorOpen} />
+      {canWriteDeals ? <LostReasonModal isPending={markLost.isPending} onCancel={() => setLostOpen(false)} onConfirm={(reason) => markLost.mutate(reason)} open={lostOpen} /> : null}
+      {canWriteActivities ? (
+        <ActivityForm
+          initialLink={{ id: deal.id, label: deal.title, type: "deal" }}
+          onOpenChange={setActivityOpen}
+          onSaved={() => void dealQuery.refetch()}
+          open={activityOpen}
+        />
+      ) : null}
+      {canWriteDeals ? (
+        <>
+          <DealForm deal={deal} onOpenChange={setEditOpen} onSaved={() => void dealQuery.refetch()} open={editOpen} selectedPipelineId={deal.pipeline_id} />
+          <AddCollaboratorDialog dealId={deal.id} onOpenChange={setCollaboratorOpen} open={collaboratorOpen} />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Account, Contact, ContactTimelineItem } from "@/types/api";
 
 type TimelineFilter = "all" | "calls" | "emails" | "tasks" | "deals";
@@ -95,6 +96,7 @@ function customFieldEntries(contact?: Contact): Array<[string, string | number |
 
 export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
   const queryClient = useQueryClient();
+  const { canWriteContacts, canWriteActivities } = usePermissions();
   const [filter, setFilter] = useState<TimelineFilter>("all");
   const [editOpen, setEditOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -177,18 +179,24 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setActivityOpen(true)} type="button">
-              <Activity className="h-4 w-4" aria-hidden="true" />
-              Log Activity
-            </Button>
-            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
-              <Edit className="h-4 w-4" aria-hidden="true" />
-              Edit
-            </Button>
-            <Button onClick={() => setConfirmArchive(true)} type="button" variant="ghost">
-              <Archive className="h-4 w-4" aria-hidden="true" />
-              Archive
-            </Button>
+            {canWriteActivities ? (
+              <Button onClick={() => setActivityOpen(true)} type="button">
+                <Activity className="h-4 w-4" aria-hidden="true" />
+                Log Activity
+              </Button>
+            ) : null}
+            {canWriteContacts ? (
+              <>
+                <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+                  <Edit className="h-4 w-4" aria-hidden="true" />
+                  Edit
+                </Button>
+                <Button onClick={() => setConfirmArchive(true)} type="button" variant="ghost">
+                  <Archive className="h-4 w-4" aria-hidden="true" />
+                  Archive
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </section>
@@ -266,22 +274,26 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
         </aside>
       </div>
 
-      <ContactForm contact={contact} onOpenChange={setEditOpen} onSaved={() => void contactQuery.refetch()} open={editOpen} />
-      <ActivityForm
-        initialLink={{ id: contact.id, label: `${contact.first_name} ${contact.last_name}`, type: "contact" }}
-        onOpenChange={setActivityOpen}
-        onSaved={() => void timelineQuery.refetch()}
-        open={activityOpen}
-      />
+      {canWriteContacts ? <ContactForm contact={contact} onOpenChange={setEditOpen} onSaved={() => void contactQuery.refetch()} open={editOpen} /> : null}
+      {canWriteActivities ? (
+        <ActivityForm
+          initialLink={{ id: contact.id, label: `${contact.first_name} ${contact.last_name}`, type: "contact" }}
+          onOpenChange={setActivityOpen}
+          onSaved={() => void timelineQuery.refetch()}
+          open={activityOpen}
+        />
+      ) : null}
 
-      <ConfirmDialog
-        confirmLabel="Confirm"
-        isPending={archiveMutation.isPending}
-        onConfirm={() => archiveMutation.mutate()}
-        onOpenChange={setConfirmArchive}
-        open={confirmArchive}
-        title="Archive contact"
-      />
+      {canWriteContacts ? (
+        <ConfirmDialog
+          confirmLabel="Confirm"
+          isPending={archiveMutation.isPending}
+          onConfirm={() => archiveMutation.mutate()}
+          onOpenChange={setConfirmArchive}
+          open={confirmArchive}
+          title="Archive contact"
+        />
+      ) : null}
     </div>
   );
 }

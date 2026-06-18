@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.permissions import CONTACT_WRITE_ROLES
 from app.dependencies import get_current_user, get_db, require_role
 from app.models import User
 from app.schemas.contacts import (
@@ -48,7 +49,7 @@ async def list_contacts(
 @router.post("/", response_model=ContactResponse, status_code=status.HTTP_201_CREATED)
 async def create_contact(
     contact_in: ContactCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CONTACT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ContactResponse:
     return await contacts_service.create_contact(db, contact_in, current_user)
@@ -67,7 +68,7 @@ async def get_contact(
 async def update_contact(
     contact_id: UUID,
     contact_in: ContactUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CONTACT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ContactResponse:
     return await contacts_service.update_contact(db, contact_id, contact_in, current_user)
@@ -76,7 +77,7 @@ async def update_contact(
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_contact(
     contact_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CONTACT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await contacts_service.soft_delete_contact(db, contact_id, current_user)
@@ -115,7 +116,7 @@ async def get_contact_timeline(
 async def add_contact_tags(
     contact_id: UUID,
     tags_in: ContactTagsUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CONTACT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ContactResponse:
     return await contacts_service.add_contact_tags(db, contact_id, tags_in, current_user)
@@ -125,7 +126,7 @@ async def add_contact_tags(
 async def remove_contact_tag(
     contact_id: UUID,
     tag: str,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CONTACT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ContactResponse:
     return await contacts_service.remove_contact_tag(db, contact_id, tag, current_user)

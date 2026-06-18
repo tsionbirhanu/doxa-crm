@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 import type { Activity as ActivityRecord, Lead, LeadScoreResponse } from "@/types/api";
 
 interface LeadDetailClientProps {
@@ -58,6 +59,7 @@ function lifecycleItems(lead: Lead) {
 
 export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
   const queryClient = useQueryClient();
+  const { canWriteActivities, canWriteLeads } = usePermissions();
   const [convertOpen, setConvertOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -118,28 +120,38 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
             <p className="mt-1 text-sm text-[#64748B]">{lead.company}</p>
             <LeadScoreBar className="mt-4 max-w-sm" score={lead.score} />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={lead.status === "converted"} onClick={() => setConvertOpen(true)} type="button">
-              <Repeat2 className="h-4 w-4" aria-hidden="true" />
-              Convert
-            </Button>
-            <Button onClick={() => setAssignOpen(true)} type="button" variant="outline">
-              <UserCheck className="h-4 w-4" aria-hidden="true" />
-              Assign
-            </Button>
-            <Button disabled={scoreMutation.isPending} onClick={() => scoreMutation.mutate()} type="button" variant="outline">
-              <RefreshCcw className={cn("h-4 w-4", scoreMutation.isPending && "animate-spin")} aria-hidden="true" />
-              Recalculate Score
-            </Button>
-            <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
-              <Edit className="h-4 w-4" aria-hidden="true" />
-              Edit
-            </Button>
-            <Button onClick={() => setActivityOpen(true)} type="button" variant="ghost">
-              <Activity className="h-4 w-4" aria-hidden="true" />
-              Log Activity
-            </Button>
-          </div>
+          {canWriteLeads || canWriteActivities ? (
+            <div className="flex flex-wrap gap-2">
+              {canWriteLeads ? (
+                <>
+                  <Button disabled={lead.status === "converted"} onClick={() => setConvertOpen(true)} type="button">
+                    <Repeat2 className="h-4 w-4" aria-hidden="true" />
+                    Convert
+                  </Button>
+                  <Button onClick={() => setAssignOpen(true)} type="button" variant="outline">
+                    <UserCheck className="h-4 w-4" aria-hidden="true" />
+                    Assign
+                  </Button>
+                  <Button disabled={scoreMutation.isPending} onClick={() => scoreMutation.mutate()} type="button" variant="outline">
+                    <RefreshCcw className={cn("h-4 w-4", scoreMutation.isPending && "animate-spin")} aria-hidden="true" />
+                    Recalculate Score
+                  </Button>
+                  <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
+                    <Edit className="h-4 w-4" aria-hidden="true" />
+                    Edit
+                  </Button>
+                </>
+              ) : null}
+              {canWriteActivities ? (
+                <Button onClick={() => setActivityOpen(true)} type="button" variant="ghost">
+                  <Activity className="h-4 w-4" aria-hidden="true" />
+                  Log Activity
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-[#64748B]">Read-only access</div>
+          )}
         </div>
       </section>
 
@@ -168,9 +180,11 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
                 <h2 className="text-base font-semibold text-[#0F2444]">Activities</h2>
                 <p className="mt-1 text-sm text-[#64748B]">Logged work against this lead.</p>
               </div>
-              <Button onClick={() => setActivityOpen(true)} size="sm" type="button" variant="outline">
-                Log Activity
-              </Button>
+              {canWriteActivities ? (
+                <Button onClick={() => setActivityOpen(true)} size="sm" type="button" variant="outline">
+                  Log Activity
+                </Button>
+              ) : null}
             </div>
             <div className="mt-4 space-y-3">
               {activitiesQuery.isLoading ? [1, 2, 3].map((item) => <Skeleton className="h-20 rounded-lg" key={item} />) : null}
@@ -227,15 +241,21 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
         </aside>
       </div>
 
-      <ConvertModal lead={lead} onOpenChange={setConvertOpen} open={convertOpen} />
-      <AssignLeadDialog leadIds={[lead.id]} onAssigned={() => void leadQuery.refetch()} onOpenChange={setAssignOpen} open={assignOpen} />
-      <LeadForm lead={lead} onOpenChange={setEditOpen} onSaved={() => void leadQuery.refetch()} open={editOpen} />
-      <ActivityForm
-        initialLink={{ id: lead.id, label: lead.full_name, type: "lead" }}
-        onOpenChange={setActivityOpen}
-        onSaved={() => void activitiesQuery.refetch()}
-        open={activityOpen}
-      />
+      {canWriteLeads ? (
+        <>
+          <ConvertModal lead={lead} onOpenChange={setConvertOpen} open={convertOpen} />
+          <AssignLeadDialog leadIds={[lead.id]} onAssigned={() => void leadQuery.refetch()} onOpenChange={setAssignOpen} open={assignOpen} />
+          <LeadForm lead={lead} onOpenChange={setEditOpen} onSaved={() => void leadQuery.refetch()} open={editOpen} />
+        </>
+      ) : null}
+      {canWriteActivities ? (
+        <ActivityForm
+          initialLink={{ id: lead.id, label: lead.full_name, type: "lead" }}
+          onOpenChange={setActivityOpen}
+          onSaved={() => void activitiesQuery.refetch()}
+          open={activityOpen}
+        />
+      ) : null}
     </div>
   );
 }

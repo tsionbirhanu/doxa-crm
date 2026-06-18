@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user, get_db
+from app.auth.permissions import CAMPAIGN_WRITE_ROLES
+from app.dependencies import get_current_user, get_db, require_role
 from app.models import CampaignStatus, CampaignType, User
 from app.schemas.campaigns import (
     CampaignCreate,
@@ -48,7 +49,7 @@ async def list_campaigns(
 @router.post("/", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
 async def create_campaign(
     campaign_in: CampaignCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignResponse:
     return await campaigns_service.create_campaign(db, campaign_in, current_user)
@@ -67,7 +68,7 @@ async def get_campaign(
 async def update_campaign(
     campaign_id: UUID,
     campaign_in: CampaignUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignResponse:
     return await campaigns_service.update_campaign(db, campaign_id, campaign_in)
@@ -76,7 +77,7 @@ async def update_campaign(
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_campaign(
     campaign_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await campaigns_service.delete_campaign(db, campaign_id)
@@ -86,7 +87,7 @@ async def delete_campaign(
 @router.post("/{campaign_id}/activate", response_model=CampaignResponse)
 async def activate_campaign(
     campaign_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignResponse:
     return await campaigns_service.activate_campaign(db, campaign_id)
@@ -95,7 +96,7 @@ async def activate_campaign(
 @router.post("/{campaign_id}/pause", response_model=CampaignResponse)
 async def pause_campaign(
     campaign_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignResponse:
     return await campaigns_service.pause_campaign(db, campaign_id)
@@ -116,7 +117,7 @@ async def list_enrollments(
 async def enroll_contacts(
     campaign_id: UUID,
     enroll_in: CampaignEnrollRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[CampaignEnrollmentResponse]:
     return await campaigns_service.enroll_contacts(db, campaign_id, enroll_in)
@@ -126,7 +127,7 @@ async def enroll_contacts(
 async def unsubscribe_contact(
     campaign_id: UUID,
     contact_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignEnrollmentResponse:
     return await campaigns_service.unsubscribe_contact(db, campaign_id, contact_id)
@@ -154,7 +155,7 @@ async def list_steps(
 async def add_step(
     campaign_id: UUID,
     step_in: CampaignStepCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignStepResponse:
     return await campaigns_service.add_step(db, campaign_id, step_in)
@@ -164,7 +165,7 @@ async def add_step(
 async def reorder_steps(
     campaign_id: UUID,
     reorder_in: CampaignStepsReorderRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[CampaignStepResponse]:
     return await campaigns_service.reorder_steps(db, campaign_id, reorder_in)
@@ -175,7 +176,7 @@ async def update_step(
     campaign_id: UUID,
     step_id: UUID,
     step_in: CampaignStepUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignStepResponse:
     return await campaigns_service.update_step(db, campaign_id, step_id, step_in)
@@ -185,7 +186,7 @@ async def update_step(
 async def delete_step(
     campaign_id: UUID,
     step_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await campaigns_service.delete_step(db, campaign_id, step_id)

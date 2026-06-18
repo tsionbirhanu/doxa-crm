@@ -80,13 +80,13 @@ class FakeSession:
         return None
 
 
-def make_user(user_id: UUID | None = None):
+def make_user(user_id: UUID | None = None, role: UserRoleName = UserRoleName.sales_rep):
     now = datetime.now(timezone.utc)
     return SimpleNamespace(
         id=user_id or uuid4(),
         email="sales@example.com",
         full_name="Sales Rep",
-        role=UserRoleName.sales_rep,
+        role=role,
         is_active=True,
         created_at=now,
         updated_at=now,
@@ -177,6 +177,31 @@ async def test_create_lead_route(app, monkeypatch):
 
     assert response.status_code == 201
     assert response.json()["email"] == "ada@acme.com"
+
+
+@pytest.mark.asyncio
+async def test_read_only_user_cannot_create_lead(app, monkeypatch):
+    app.dependency_overrides[get_current_user] = lambda: make_user(role=UserRoleName.read_only)
+
+    async def forbidden_create_lead(db, lead_in, current_user_arg):
+        raise AssertionError("read-only users must not reach lead creation service")
+
+    monkeypatch.setattr(leads_router_module.leads_service, "create_lead", forbidden_create_lead)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/leads/",
+            json={
+                "full_name": "Ada Lovelace",
+                "email": "ada@acme.com",
+                "phone": "+15555550123",
+                "company": "Acme",
+                "source": "referral",
+            },
+        )
+
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

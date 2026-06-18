@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_current_user, get_db
+from app.auth.permissions import ACCOUNT_WRITE_ROLES
+from app.dependencies import get_current_user, get_db, require_role
 from app.models import AccountTier, User
 from app.schemas.accounts import AccountCreate, AccountDealResponse, AccountResponse, AccountUpdate
 from app.schemas.contacts import ContactResponse
@@ -37,7 +38,7 @@ async def list_accounts(
 @router.post("/", response_model=AccountResponse, status_code=status.HTTP_201_CREATED)
 async def create_account(
     account_in: AccountCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACCOUNT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AccountResponse:
     return await accounts_service.create_account(db, account_in, current_user)
@@ -56,7 +57,7 @@ async def get_account(
 async def update_account(
     account_id: UUID,
     account_in: AccountUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACCOUNT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AccountResponse:
     return await accounts_service.update_account(db, account_id, account_in, current_user)
@@ -65,7 +66,7 @@ async def update_account(
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     account_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_role(*ACCOUNT_WRITE_ROLES))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     await accounts_service.soft_delete_account(db, account_id, current_user)
