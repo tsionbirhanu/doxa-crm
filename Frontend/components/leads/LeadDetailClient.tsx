@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, Edit, RefreshCcw, Repeat2, UserCheck } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ActivityForm } from "@/components/activities/ActivityForm";
 import { AssignLeadDialog } from "@/components/leads/AssignLeadDialog";
@@ -82,6 +82,17 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
   });
 
   const lead = leadQuery.data;
+  const activityInitialLink = useMemo(
+    () =>
+      lead
+        ? {
+            id: lead.id,
+            label: lead.full_name,
+            type: "lead" as const,
+          }
+        : undefined,
+    [lead?.full_name, lead?.id],
+  );
 
   if (leadQuery.isLoading) {
     return (
@@ -124,9 +135,9 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
             <div className="flex flex-wrap gap-2">
               {canWriteLeads ? (
                 <>
-                  <Button disabled={lead.status === "converted"} onClick={() => setConvertOpen(true)} type="button">
+                  <Button onClick={() => setConvertOpen(true)} type="button">
                     <Repeat2 className="h-4 w-4" aria-hidden="true" />
-                    Convert
+                    {lead.status === "converted" ? "Contact" : "Convert"}
                   </Button>
                   <Button onClick={() => setAssignOpen(true)} type="button" variant="outline">
                     <UserCheck className="h-4 w-4" aria-hidden="true" />
@@ -250,7 +261,7 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
       ) : null}
       {canWriteActivities ? (
         <ActivityForm
-          initialLink={{ id: lead.id, label: lead.full_name, type: "lead" }}
+          initialLink={activityInitialLink}
           onOpenChange={setActivityOpen}
           onSaved={() => void activitiesQuery.refetch()}
           open={activityOpen}

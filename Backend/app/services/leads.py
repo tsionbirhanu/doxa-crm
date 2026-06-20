@@ -45,6 +45,7 @@ from app.services.lead_scoring import calculate_lead_score, recalculate_lead_sco
 from app.services import search as search_service
 
 ALLOWED_IMPORT_COLUMNS = {"full_name", "email", "phone", "company", "source"}
+CONVERTED_FROM_LEAD_FIELD = "converted_from_lead_id"
 
 
 def _pagination(page: int, page_size: int) -> tuple[int, int]:
@@ -84,6 +85,51 @@ def validate_status_transition(current: LeadStatus, target: LeadStatus) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Converted leads cannot move back to an earlier status",
         )
+
+
+async def _find_converted_contact(db: AsyncSession, lead_id: UUID) -> Contact | None:
+    result = await db.execute(
+        select(Contact)
+        .where(
+            Contact.is_active.is_(True),
+            Contact.custom_fields.contains({CONVERTED_FROM_LEAD_FIELD: str(lead_id)}),
+        )
+        .order_by(Contact.created_at.asc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _find_deal_for_contact(db: AsyncSession, contact_id: UUID) -> Deal | None:
+    result = await db.execute(
+        select(Deal)
+        .where(Deal.contact_id == contact_id, Deal.is_active.is_(True))
+        .order_by(Deal.created_at.asc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _existing_conversion_response(db: AsyncSession, lead: Lead) -> LeadConvertResponse | None:
+    contact = await _find_converted_contact(db, lead.id)
+    if contact is None:
+        return None
+
+    if lead.status != LeadStatus.converted or lead.converted_at is None:
+        lead.status = LeadStatus.converted
+        lead.converted_at = lead.converted_at or datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(lead)
+
+    lead_response = await build_lead_response(db, lead)
+    await search_service.sync_lead_to_search(lead_response)
+    deal = await _find_deal_for_contact(db, contact.id)
+    return LeadConvertResponse(
+        lead=lead_response,
+        contact_id=contact.id,
+        account_id=contact.account_id,
+        deal_id=deal.id if deal is not None else None,
+    )
 
 
 async def build_lead_response(db: AsyncSession, lead: Lead) -> LeadResponse:
@@ -366,6 +412,10 @@ async def convert_lead(
     convert_in: LeadConvertRequest,
 ) -> LeadConvertResponse:
     lead = await get_lead_model(db, lead_id)
+    existing_response = await _existing_conversion_response(db, lead)
+    if existing_response is not None:
+        return existing_response
+
     validate_status_transition(lead.status, LeadStatus.converted)
 
     first_name, last_name = _split_name(lead.full_name)
@@ -380,7 +430,7 @@ async def convert_lead(
                 size="Unknown",
                 website=_domain_website(lead.email),
                 address={},
-                custom_fields={"converted_from_lead_id": str(lead.id)},
+                custom_fields={CONVERTED_FROM_LEAD_FIELD: str(lead.id)},
                 tier=AccountTier.smb,
                 owner_id=lead.assigned_to,
             )
@@ -406,7 +456,7 @@ async def convert_lead(
             account_id=account.id if account is not None else None,
             owner_id=lead.assigned_to,
             tags=["converted-lead"],
-            custom_fields={"converted_from_lead_id": str(lead.id)},
+            custom_fields={CONVERTED_FROM_LEAD_FIELD: str(lead.id)},
         )
         db.add(contact)
         await db.flush()

@@ -703,6 +703,78 @@ async def seed_leads(
     return leads
 
 
+async def seed_converted_lead_contacts(
+    db: AsyncSession,
+    stats: SeedStats,
+    users: dict[str, User],
+    accounts: dict[str, Account],
+    contacts: dict[str, Contact],
+    leads: dict[str, Lead],
+) -> None:
+    sam_lead = leads["sam"]
+    converted_field = {"converted_from_lead_id": str(sam_lead.id)}
+
+    pilotworks = await upsert_one(
+        db,
+        stats,
+        "accounts",
+        select(Account).where(Account.name == sam_lead.company),
+        {
+            "name": sam_lead.company,
+            "industry": "Software",
+            "size": "51-200",
+            "website": "https://pilotworks.example",
+            "address": {"city": "San Diego", "state": "CA", "country": "US"},
+            "tier": AccountTier.smb,
+            "owner_id": users["sales_rep_alex"].id,
+            "custom_fields": converted_field,
+            "is_active": True,
+        },
+        {
+            "industry": "Software",
+            "size": "51-200",
+            "website": "https://pilotworks.example",
+            "address": {"city": "San Diego", "state": "CA", "country": "US"},
+            "tier": AccountTier.smb,
+            "owner_id": users["sales_rep_alex"].id,
+            "custom_fields": converted_field,
+            "is_active": True,
+        },
+    )
+    accounts["pilotworks"] = pilotworks
+
+    sam_contact = await upsert_one(
+        db,
+        stats,
+        "contacts",
+        select(Contact).where(Contact.email == sam_lead.email),
+        {
+            "first_name": "Sam",
+            "last_name": "Novak",
+            "email": sam_lead.email,
+            "phone": sam_lead.phone,
+            "title": "Lead",
+            "account_id": pilotworks.id,
+            "owner_id": sam_lead.assigned_to,
+            "tags": ["converted-lead"],
+            "custom_fields": converted_field,
+            "is_active": True,
+        },
+        {
+            "first_name": "Sam",
+            "last_name": "Novak",
+            "phone": sam_lead.phone,
+            "title": "Lead",
+            "account_id": pilotworks.id,
+            "owner_id": sam_lead.assigned_to,
+            "tags": ["converted-lead"],
+            "custom_fields": converted_field,
+            "is_active": True,
+        },
+    )
+    contacts["sam"] = sam_contact
+
+
 async def seed_deals(
     db: AsyncSession,
     stats: SeedStats,
@@ -1324,6 +1396,7 @@ async def seed_demo_data() -> None:
         pipeline, stages = await seed_pipelines(db, stats)
         campaigns = await seed_campaigns(db, stats, users, contacts)
         leads = await seed_leads(db, stats, users, campaigns)
+        await seed_converted_lead_contacts(db, stats, users, accounts, contacts, leads)
         deals = await seed_deals(db, stats, users, accounts, contacts, pipeline, stages)
         await seed_activities_and_tasks(db, stats, users, accounts, contacts, leads, deals)
         await seed_projects(db, stats, users, accounts, deals)

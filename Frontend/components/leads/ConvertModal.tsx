@@ -106,8 +106,12 @@ export function ConvertModal({ lead, onOpenChange, open }: ConvertModalProps) {
     >
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Convert Lead</DialogTitle>
-          <DialogDescription>Create a contact, and optionally create an account and deal.</DialogDescription>
+          <DialogTitle>{lead.status === "converted" ? "Lead Contact" : "Convert Lead"}</DialogTitle>
+          <DialogDescription>
+            {lead.status === "converted"
+              ? "Create or return the contact record for this converted lead."
+              : "Create a contact, and optionally create an account and deal."}
+          </DialogDescription>
         </DialogHeader>
 
         {result ? (
@@ -188,14 +192,19 @@ export function ConvertModal({ lead, onOpenChange, open }: ConvertModalProps) {
                 Deal conversion requires an existing account named {lead.company}.
               </div>
             ) : null}
+            {lead.status === "converted" ? (
+              <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                This lead is already marked converted. Submitting will create or return its contact record.
+              </div>
+            ) : null}
             {convertLead.isError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not convert lead.</div> : null}
 
             <div className="flex justify-end gap-3">
               <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
                 Cancel
               </Button>
-              <Button className="bg-[#2563EB] hover:bg-blue-700" disabled={convertLead.isPending || lead.status === "converted"} type="submit">
-                Convert Lead
+              <Button className="bg-[#2563EB] hover:bg-blue-700" disabled={convertLead.isPending} type="submit">
+                {lead.status === "converted" ? "Create Contact" : "Convert Lead"}
               </Button>
             </div>
           </form>

@@ -176,8 +176,8 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
         ? [
             {
               cell: (lead: Lead) => (
-                <Button disabled={lead.status === "converted"} onClick={() => setConvertLead(lead)} size="sm" type="button" variant="outline">
-                  Convert
+                <Button onClick={() => setConvertLead(lead)} size="sm" type="button" variant="outline">
+                  {lead.status === "converted" ? "Contact" : "Convert"}
                 </Button>
               ),
               header: "",

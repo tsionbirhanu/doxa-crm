@@ -124,6 +124,17 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
   });
 
   const contact = contactQuery.data;
+  const activityInitialLink = useMemo(
+    () =>
+      contact
+        ? {
+            id: contact.id,
+            label: `${contact.first_name} ${contact.last_name}`,
+            type: "contact" as const,
+          }
+        : undefined,
+    [contact?.first_name, contact?.id, contact?.last_name],
+  );
   const timeline = timelineQuery.data ?? [];
   const filteredTimeline = timeline.filter((item) => timelineMatchesFilter(item, filter));
   const openDealItems = timeline.filter((item) => item.type === "deal" && metadataString(item, "status") === "open");
@@ -277,7 +288,7 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
       {canWriteContacts ? <ContactForm contact={contact} onOpenChange={setEditOpen} onSaved={() => void contactQuery.refetch()} open={editOpen} /> : null}
       {canWriteActivities ? (
         <ActivityForm
-          initialLink={{ id: contact.id, label: `${contact.first_name} ${contact.last_name}`, type: "contact" }}
+          initialLink={activityInitialLink}
           onOpenChange={setActivityOpen}
           onSaved={() => void timelineQuery.refetch()}
           open={activityOpen}

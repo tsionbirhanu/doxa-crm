@@ -88,7 +88,22 @@ function toIsoOrNull(value?: string): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
-function buildPayload(values: ActivityFormValues): ActivityCreate {
+function buildPayload(values: ActivityFormValues, initialLink?: ActivityInitialLink): ActivityCreate {
+  if (initialLink) {
+    return {
+      account_id: initialLink.type === "account" ? initialLink.id : null,
+      body: values.body,
+      contact_id: initialLink.type === "contact" ? initialLink.id : null,
+      deal_id: initialLink.type === "deal" ? initialLink.id : null,
+      duration_minutes: values.duration_minutes ? Number(values.duration_minutes) : null,
+      lead_id: initialLink.type === "lead" ? initialLink.id : null,
+      outcome: values.outcome || null,
+      scheduled_at: toIsoOrNull(values.scheduled_at),
+      subject: values.subject,
+      type: values.type,
+    };
+  }
+
   return {
     account_id: values.account_id || null,
     body: values.body,
@@ -109,6 +124,11 @@ function contactLabel(contact: Contact): string {
 
 function optionLabel(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function linkedRecordLabel(initialLink: ActivityInitialLink): string {
+  const type = optionLabel(initialLink.type);
+  return initialLink.label ? `${type}: ${initialLink.label}` : `${type}: ${initialLink.id.slice(0, 8)}`;
 }
 
 export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: ActivityFormProps) {
@@ -138,18 +158,22 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
   }, [form, initialLink, open]);
 
   const leadsQuery = useQuery({
+    enabled: !initialLink,
     queryFn: () => api.get<Lead[]>("/leads/", { page_size: 50 }),
     queryKey: ["activities", "lead-select", debouncedLeadSearch],
   });
   const contactsQuery = useQuery({
+    enabled: !initialLink,
     queryFn: () => api.get<Contact[]>("/contacts/", { page_size: 50, search: debouncedContactSearch || undefined }),
     queryKey: ["activities", "contact-select", debouncedContactSearch],
   });
   const dealsQuery = useQuery({
+    enabled: !initialLink,
     queryFn: () => api.get<Deal[]>("/deals/", { page_size: 50 }),
     queryKey: ["activities", "deal-select", debouncedDealSearch],
   });
   const accountsQuery = useQuery({
+    enabled: !initialLink,
     queryFn: () => api.get<Account[]>("/accounts/", { page_size: 100, search: debouncedAccountSearch || undefined }),
     queryKey: ["activities", "account-select", debouncedAccountSearch],
   });
@@ -174,10 +198,14 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
   }, [accountsQuery.data, debouncedAccountSearch]);
 
   const saveActivity = useMutation({
-    mutationFn: (values: ActivityFormValues) => api.post<Activity, ActivityCreate>("/activities/", buildPayload(values)),
+    mutationFn: (values: ActivityFormValues) => api.post<Activity, ActivityCreate>("/activities/", buildPayload(values, initialLink)),
     onSuccess: (activity) => {
       void queryClient.invalidateQueries({ queryKey: ["activities"] });
       void queryClient.invalidateQueries({ queryKey: ["contacts", "timeline"] });
+      if (activity.contact_id) {
+        void queryClient.invalidateQueries({ queryKey: ["contacts", "timeline", activity.contact_id] });
+        void queryClient.invalidateQueries({ queryKey: ["contacts", "detail", activity.contact_id] });
+      }
       void queryClient.invalidateQueries({ queryKey: ["deals"] });
       void queryClient.invalidateQueries({ queryKey: ["leads", "activities"] });
       onSaved?.(activity);
@@ -249,56 +277,65 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          {initialLink ? (
             <div>
-              <Label>Lead</Label>
-              <Input disabled={submitting} onChange={(event) => setLeadSearch(event.target.value)} placeholder="Search leads" value={leadSearch} />
-              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("lead_id")}>
-                <option value="">No lead</option>
-                {leadOptions.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.full_name}
-                  </option>
-                ))}
-              </select>
+              <Label>Linked Record</Label>
+              <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-[#0F2444]">
+                {linkedRecordLabel(initialLink)}
+              </div>
             </div>
-            <div>
-              <Label>Contact</Label>
-              <Input disabled={submitting} onChange={(event) => setContactSearch(event.target.value)} placeholder="Search contacts" value={contactSearch} />
-              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("contact_id")}>
-                <option value="">No contact</option>
-                {contactOptions.map((contact) => (
-                  <option key={contact.id} value={contact.id}>
-                    {contactLabel(contact)}
-                  </option>
-                ))}
-              </select>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>Lead</Label>
+                <Input disabled={submitting} onChange={(event) => setLeadSearch(event.target.value)} placeholder="Search leads" value={leadSearch} />
+                <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("lead_id")}>
+                  <option value="">No lead</option>
+                  {leadOptions.map((lead) => (
+                    <option key={lead.id} value={lead.id}>
+                      {lead.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Contact</Label>
+                <Input disabled={submitting} onChange={(event) => setContactSearch(event.target.value)} placeholder="Search contacts" value={contactSearch} />
+                <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("contact_id")}>
+                  <option value="">No contact</option>
+                  {contactOptions.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contactLabel(contact)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Deal</Label>
+                <Input disabled={submitting} onChange={(event) => setDealSearch(event.target.value)} placeholder="Search deals" value={dealSearch} />
+                <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("deal_id")}>
+                  <option value="">No deal</option>
+                  {dealOptions.map((deal) => (
+                    <option key={deal.id} value={deal.id}>
+                      {deal.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Account</Label>
+                <Input disabled={submitting} onChange={(event) => setAccountSearch(event.target.value)} placeholder="Search accounts" value={accountSearch} />
+                <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("account_id")}>
+                  <option value="">No account</option>
+                  {accountOptions.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <Label>Deal</Label>
-              <Input disabled={submitting} onChange={(event) => setDealSearch(event.target.value)} placeholder="Search deals" value={dealSearch} />
-              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("deal_id")}>
-                <option value="">No deal</option>
-                {dealOptions.map((deal) => (
-                  <option key={deal.id} value={deal.id}>
-                    {deal.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Account</Label>
-              <Input disabled={submitting} onChange={(event) => setAccountSearch(event.target.value)} placeholder="Search accounts" value={accountSearch} />
-              <select className="mt-2 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm" disabled={submitting} {...form.register("account_id")}>
-                <option value="">No account</option>
-                {accountOptions.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
 
           {fieldError(form.formState.errors.lead_id?.message)}
           {saveActivity.isError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not save activity.</div> : null}
