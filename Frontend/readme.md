@@ -435,7 +435,7 @@ Clear local storage:
 doxa-crm-auth
 ```
 
-Then sign in again.
+Then sign in again
 
 ### Backend calls fail
 
