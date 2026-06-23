@@ -172,6 +172,22 @@ async def build_custom_report(
     return await reports_service.custom_report(db, report_in)
 
 
+@router.post("/custom/export/xlsx")
+async def export_custom_xlsx(
+    report_in: CustomReportRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    report = await reports_service.custom_report(db, report_in)
+    content = reports_service.rows_to_xlsx(f"{report_in.entity}-custom-report", report.columns, report.rows)
+    filename = f"{report_in.entity}-custom-report.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
     current_user: Annotated[User, Depends(get_current_user)],
@@ -193,6 +209,23 @@ async def export_csv(
     return Response(
         content=content,
         media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/xlsx")
+async def export_xlsx(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    report: str,
+) -> Response:
+    columns, rows = await reports_service.report_rows_for_export(db, report, _parse_export_params(request))
+    content = reports_service.rows_to_xlsx(report, columns, rows)
+    filename = f"{report.replace('/', '-')}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

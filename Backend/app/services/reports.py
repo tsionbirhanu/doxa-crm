@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import csv
 import io
+import math
+import zipfile
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
+from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, status
 from sqlalchemy import Date, and_, case, cast, func, literal, select
@@ -858,3 +861,199 @@ def rows_to_csv(columns: list[str], rows: list[list[Any]]) -> str:
     writer.writerow(columns)
     writer.writerows(rows)
     return output.getvalue()
+
+
+def rows_to_xlsx(report_name: str, columns: list[str], rows: list[list[Any]]) -> bytes:
+    workbook = io.BytesIO()
+    safe_sheet_name = _xlsx_sheet_name(report_name)
+
+    with zipfile.ZipFile(workbook, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", _xlsx_content_types())
+        archive.writestr("_rels/.rels", _xlsx_root_relationships())
+        archive.writestr("docProps/app.xml", _xlsx_app_properties())
+        archive.writestr("docProps/core.xml", _xlsx_core_properties(report_name))
+        archive.writestr("xl/workbook.xml", _xlsx_workbook(safe_sheet_name))
+        archive.writestr("xl/_rels/workbook.xml.rels", _xlsx_workbook_relationships())
+        archive.writestr("xl/styles.xml", _xlsx_styles())
+        archive.writestr("xl/worksheets/sheet1.xml", _xlsx_worksheet(columns, rows))
+
+    return workbook.getvalue()
+
+
+def _xlsx_column_name(index: int) -> str:
+    name = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        name = chr(65 + remainder) + name
+    return name
+
+
+def _xlsx_sheet_name(report_name: str) -> str:
+    cleaned = "".join(" " if char in "[]:*?/\\\\" else char for char in report_name).strip()
+    return (cleaned or "Report")[:31]
+
+
+def _xlsx_xml_text(value: Any) -> str:
+    text = str(value)
+    text = "".join(char for char in text if char in "\t\n\r" or ord(char) >= 32)
+    return escape(text)
+
+
+def _xlsx_xml_attr(value: str) -> str:
+    return escape(value, {'"': "&quot;"})
+
+
+def _xlsx_cell(reference: str, value: Any, style: int | None = None) -> str:
+    style_attr = f' s="{style}"' if style is not None else ""
+
+    if value is None:
+        return f'<c r="{reference}"{style_attr}/>'
+
+    if isinstance(value, bool):
+        return f'<c r="{reference}" t="b"{style_attr}><v>{int(value)}</v></c>'
+
+    if isinstance(value, Decimal):
+        value = float(value)
+
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        if isinstance(value, float) and not math.isfinite(value):
+            return f'<c r="{reference}" t="inlineStr"{style_attr}><is><t xml:space="preserve">{_xlsx_xml_text(value)}</t></is></c>'
+        return f'<c r="{reference}"{style_attr}><v>{value}</v></c>'
+
+    if isinstance(value, datetime):
+        value = value.isoformat()
+    elif isinstance(value, date):
+        value = value.isoformat()
+    elif isinstance(value, UUID):
+        value = str(value)
+    elif hasattr(value, "value"):
+        value = str(value.value)
+
+    return f'<c r="{reference}" t="inlineStr"{style_attr}><is><t xml:space="preserve">{_xlsx_xml_text(value)}</t></is></c>'
+
+
+def _xlsx_row(row_number: int, values: list[Any], *, header: bool = False) -> str:
+    style = 1 if header else None
+    cells = [
+        _xlsx_cell(f"{_xlsx_column_name(column_index)}{row_number}", value, style=style)
+        for column_index, value in enumerate(values, start=1)
+    ]
+    return f'<row r="{row_number}">{"".join(cells)}</row>'
+
+
+def _xlsx_worksheet(columns: list[str], rows: list[list[Any]]) -> str:
+    safe_columns = columns or ["value"]
+    safe_rows = rows or []
+    row_count = max(len(safe_rows) + 1, 1)
+    column_count = max(len(safe_columns), 1)
+    dimension = f"A1:{_xlsx_column_name(column_count)}{row_count}"
+    sheet_rows = [_xlsx_row(1, safe_columns, header=True)]
+    sheet_rows.extend(_xlsx_row(index, row) for index, row in enumerate(safe_rows, start=2))
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<dimension ref="{dimension}"/>'
+        '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+        '<selection pane="bottomLeft"/></sheetView></sheetViews>'
+        '<sheetFormatPr defaultRowHeight="15"/>'
+        '<sheetData>'
+        f'{"".join(sheet_rows)}'
+        '</sheetData>'
+        '<autoFilter ref="'
+        f'{dimension}'
+        '"/>'
+        '</worksheet>'
+    )
+
+
+def _xlsx_content_types() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+        '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        "</Types>"
+    )
+
+
+def _xlsx_root_relationships() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+        '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+        "</Relationships>"
+    )
+
+
+def _xlsx_workbook(sheet_name: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        "<sheets>"
+        f'<sheet name="{_xlsx_xml_attr(sheet_name)}" sheetId="1" r:id="rId1"/>'
+        "</sheets>"
+        "</workbook>"
+    )
+
+
+def _xlsx_workbook_relationships() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        "</Relationships>"
+    )
+
+
+def _xlsx_styles() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
+        '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill></fills>'
+        '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        '<xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>'
+        '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        "</styleSheet>"
+    )
+
+
+def _xlsx_app_properties() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+        'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+        "<Application>Doxa CRM</Application>"
+        "</Properties>"
+    )
+
+
+def _xlsx_core_properties(report_name: str) -> str:
+    created_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    title = _xlsx_xml_text(report_name)
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/" '
+        'xmlns:dcterms="http://purl.org/dc/terms/" '
+        'xmlns:dcmitype="http://purl.org/dc/dcmitype/" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+        f"<dc:title>{title}</dc:title>"
+        "<dc:creator>Doxa CRM</dc:creator>"
+        f'<dcterms:created xsi:type="dcterms:W3CDTF">{created_at}</dcterms:created>'
+        f'<dcterms:modified xsi:type="dcterms:W3CDTF">{created_at}</dcterms:modified>'
+        "</cp:coreProperties>"
+    )

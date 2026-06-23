@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from io import BytesIO
 from types import SimpleNamespace
 from uuid import UUID, uuid4
+from zipfile import ZipFile
 
 import httpx
 import pytest
@@ -26,7 +28,7 @@ from app.dependencies import get_current_user, get_db
 from app.main import create_app
 from app.models import UserRoleName
 import app.routers.reports as reports_router_module
-from app.schemas.reports import CustomReportRequest
+from app.schemas.reports import CustomReportRequest, CustomReportResponse
 from app.services import reports as reports_service
 
 
@@ -216,3 +218,64 @@ async def test_csv_export_route_returns_download(app, monkeypatch):
     assert response.headers["content-type"].startswith("text/csv")
     assert "pipeline-summary.csv" in response.headers["content-disposition"]
     assert "Proposal Sent,2" in response.text
+
+
+@pytest.mark.asyncio
+async def test_xlsx_export_route_returns_workbook(app, monkeypatch):
+    async def fake_report_rows_for_export(db, report, params):
+        assert report == "pipeline-summary"
+        assert params["date_from"] == date(2026, 6, 1)
+        return ["stage", "count"], [["Proposal Sent", 2]]
+
+    monkeypatch.setattr(
+        reports_router_module.reports_service,
+        "report_rows_for_export",
+        fake_report_rows_for_export,
+    )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/reports/export/xlsx?report=pipeline-summary&date_from=2026-06-01")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "pipeline-summary.xlsx" in response.headers["content-disposition"]
+    assert response.content.startswith(b"PK")
+
+    with ZipFile(BytesIO(response.content)) as workbook:
+        worksheet = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+
+    assert "Proposal Sent" in worksheet
+    assert "<v>2</v>" in worksheet
+
+
+@pytest.mark.asyncio
+async def test_custom_xlsx_export_route_returns_workbook(app, monkeypatch):
+    async def fake_custom_report(db, report_in):
+        assert report_in.entity == "deals"
+        assert report_in.fields == ["status"]
+        return CustomReportResponse(columns=["status", "count"], rows=[["open", 3]], total=1)
+
+    monkeypatch.setattr(reports_router_module.reports_service, "custom_report", fake_custom_report)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/reports/custom/export/xlsx",
+            json={"entity": "deals", "fields": ["status"], "group_by": "status"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "deals-custom-report.xlsx" in response.headers["content-disposition"]
+    assert response.content.startswith(b"PK")
+
+    with ZipFile(BytesIO(response.content)) as workbook:
+        worksheet = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+
+    assert "open" in worksheet
+    assert "<v>3</v>" in worksheet
