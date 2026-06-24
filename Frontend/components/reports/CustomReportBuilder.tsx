@@ -8,6 +8,7 @@ import { ReportCard } from "@/components/reports/ReportCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, apiErrorDetail } from "@/lib/api";
+import { downloadCustomReportXlsx } from "@/lib/report-export";
 import { cn } from "@/lib/utils";
 import type {
   CustomReportEntity,
@@ -193,6 +194,9 @@ export function CustomReportBuilder() {
   const [dateField, setDateField] = useState(() => firstDateField(ENTITY_CONFIG.deals));
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [exportError, setExportError] = useState("");
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [lastRequest, setLastRequest] = useState<CustomReportRequest | null>(null);
 
   const currentConfig = ENTITY_CONFIG[entity];
   const selectedFieldSet = useMemo(() => new Set(selectedFields), [selectedFields]);
@@ -204,7 +208,11 @@ export function CustomReportBuilder() {
 
   const reportMutation = useMutation({
     mutationFn: (payload: CustomReportRequest) => api.post<CustomReportResponse, CustomReportRequest>("/reports/custom", payload),
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data, variables) => {
+      setExportError("");
+      setLastRequest(variables);
+      setResult(data);
+    },
   });
 
   function fieldOption(fieldId: string): FieldOption {
@@ -230,6 +238,8 @@ export function CustomReportBuilder() {
     setDateField(firstDateField(nextConfig));
     setDateFrom("");
     setDateTo("");
+    setExportError("");
+    setLastRequest(null);
     setResult(null);
   }
 
@@ -326,6 +336,7 @@ export function CustomReportBuilder() {
   }
 
   function runReport() {
+    setExportError("");
     reportMutation.mutate(buildRequest());
   }
 
@@ -350,8 +361,24 @@ export function CustomReportBuilder() {
     URL.revokeObjectURL(url);
   }
 
+  async function downloadXlsx() {
+    if (!lastRequest) {
+      return;
+    }
+
+    setExportError("");
+    setExportingXlsx(true);
+    try {
+      await downloadCustomReportXlsx(lastRequest);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export XLSX.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   const canRun = groupBy || selectedFields.length > 0;
-  const errorText = reportMutation.isError ? apiErrorDetail(reportMutation.error, "Could not run custom report.") : "";
+  const errorText = reportMutation.isError ? apiErrorDetail(reportMutation.error, "Could not run custom report.") : exportError;
 
   return (
     <div className="grid gap-6">
@@ -365,6 +392,10 @@ export function CustomReportBuilder() {
             <Button disabled={!result} onClick={downloadCsv} type="button" variant="outline">
               <Download className="h-4 w-4" aria-hidden="true" />
               Export CSV
+            </Button>
+            <Button disabled={!lastRequest || exportingXlsx} onClick={() => void downloadXlsx()} type="button" variant="outline">
+              <Download className={cn("h-4 w-4", exportingXlsx && "animate-pulse")} aria-hidden="true" />
+              {exportingXlsx ? "Exporting" : "Export XLSX"}
             </Button>
             <Button disabled={!canRun || reportMutation.isPending} onClick={runReport} type="button">
               <Play className={cn("h-4 w-4", reportMutation.isPending && "animate-pulse")} aria-hidden="true" />

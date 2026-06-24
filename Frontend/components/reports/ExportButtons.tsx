@@ -12,9 +12,9 @@ interface ExportButtonsProps {
 }
 
 export function ExportButtons({ params = {}, report }: ExportButtonsProps) {
-  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | "xlsx" | null>(null);
 
-  async function runExport(format: "csv" | "pdf") {
+  async function runExport(format: "csv" | "pdf" | "xlsx") {
     setExporting(format);
     try {
       await downloadReport(format, report, params);
@@ -32,6 +32,10 @@ export function ExportButtons({ params = {}, report }: ExportButtonsProps) {
       <Button disabled={exporting !== null} onClick={() => void runExport("pdf")} size="sm" type="button" variant="outline">
         <Download className="h-4 w-4" aria-hidden="true" />
         {exporting === "pdf" ? "Exporting" : "Export PDF"}
+      </Button>
+      <Button disabled={exporting !== null} onClick={() => void runExport("xlsx")} size="sm" type="button" variant="outline">
+        <Download className="h-4 w-4" aria-hidden="true" />
+        {exporting === "xlsx" ? "Exporting" : "Export XLSX"}
       </Button>
     </>
   );
