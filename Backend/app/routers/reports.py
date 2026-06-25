@@ -4,6 +4,7 @@ from datetime import date
 from io import BytesIO
 from typing import Annotated
 from uuid import UUID
+from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,16 +73,37 @@ async def get_win_loss(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     group_by: Annotated[str, Query(pattern="^(owner|source|lost_reason)$")] = "owner",
+    pipeline_id: UUID | None = None,
+    owner_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[WinLossRow]:
-    return await reports_service.win_loss(db, group_by=group_by)
+    return await reports_service.win_loss(
+        db,
+        group_by=group_by,
+        pipeline_id=pipeline_id,
+        owner_id=owner_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.get("/forecast", response_model=list[ForecastMonthRow])
 async def get_forecast(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    pipeline_id: UUID | None = None,
+    owner_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[ForecastMonthRow]:
-    return await reports_service.forecast(db)
+    return await reports_service.forecast(
+        db,
+        pipeline_id=pipeline_id,
+        owner_id=owner_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.get("/quota", response_model=list[QuotaRow])
@@ -264,23 +286,54 @@ def _parse_export_params(request: Request) -> dict:
 def _build_pdf(report: str, columns: list[str], rows: list[list]) -> bytes:
     try:
         from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.pagesizes import landscape, letter
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     except Exception:
         return _fallback_pdf(report, columns, rows)
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), leftMargin=24, rightMargin=24, topMargin=28, bottomMargin=28)
     styles = getSampleStyleSheet()
-    table = Table([columns] + rows[:200])
+    if not columns:
+        columns = ["No Data"]
+        rows = []
+    cell_style = ParagraphStyle(
+        "ReportCell",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=7,
+        leading=8,
+        wordWrap="CJK",
+    )
+    header_style = ParagraphStyle(
+        "ReportHeader",
+        parent=cell_style,
+        fontName="Helvetica-Bold",
+        textColor=colors.HexColor("#111827"),
+    )
+    column_count = max(len(columns), 1)
+    column_widths = [doc.width / column_count] * column_count
+
+    def pdf_cell(value, style):
+        return Paragraph(escape("" if value is None else str(value)), style)
+
+    def row_cells(row):
+        padded = list(row[:column_count]) + [""] * max(column_count - len(row), 0)
+        return [pdf_cell(value, cell_style) for value in padded]
+
+    table_data = [[pdf_cell(column, header_style) for column in columns]] + [row_cells(row) for row in rows[:200]]
+    table = Table(table_data, colWidths=column_widths, repeatRows=1, hAlign="LEFT")
     table.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E5E7EB")),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]
         )
     )

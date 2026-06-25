@@ -28,8 +28,8 @@ export function ReportsPageClient() {
     <div className="grid gap-6">
       <PageHeader subtitle="Analyze pipeline, lead, activity, and customer performance." title="Reports" />
 
-      <section className="rounded-xl bg-white p-2 shadow-sm">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="rounded-lg border border-slate-200/70 bg-white p-1.5 shadow-sm">
+        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -37,8 +37,8 @@ export function ReportsPageClient() {
             return (
               <button
                 className={cn(
-                  "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition",
-                  active ? "bg-[#2563EB] text-white" : "text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#0F2444]",
+                  "inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors",
+                  active ? "bg-[#0F2444] text-white shadow-sm" : "text-[#64748B] hover:bg-slate-50 hover:text-[#0F2444]",
                 )}
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}

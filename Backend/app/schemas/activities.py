@@ -79,6 +79,7 @@ class ActivityResponse(BaseModel):
     deal_id: UUID | None
     account_id: UUID | None
     owner_id: UUID
+    owner_name: str | None = None
     scheduled_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
@@ -134,10 +135,16 @@ class TaskResponse(BaseModel):
     completed_at: datetime | None
     activity_id: UUID | None
     lead_id: UUID | None
+    lead_name: str | None = None
     contact_id: UUID | None
+    contact_name: str | None = None
     deal_id: UUID | None
+    deal_name: str | None = None
     account_id: UUID | None
+    account_name: str | None = None
     owner_id: UUID
+    owner_name: str | None = None
+    assigned_to_name: str | None = None
     created_at: datetime
     updated_at: datetime
 

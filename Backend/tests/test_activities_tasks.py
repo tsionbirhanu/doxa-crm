@@ -27,8 +27,8 @@ from app.models import ActivityType, TaskPriority, TaskStatus, UserRoleName
 import app.routers.activities as activities_router_module
 import app.routers.tasks as tasks_router_module
 from app.schemas.activities import ActivityResponse, TaskResponse
-from app.services.activities import log_email_activity
-from app.services.tasks import complete_task
+from app.services.activities import activities_to_csv, list_activities, log_email_activity
+from app.services.tasks import complete_task, list_overdue_tasks
 
 
 class FakeResult:
@@ -103,6 +103,7 @@ def make_activity_response(activity_id: UUID | None = None, owner_id: UUID | Non
         deal_id=None,
         account_id=None,
         owner_id=owner_id or uuid4(),
+        owner_name=None,
         scheduled_at=None,
         completed_at=now,
         created_at=now,
@@ -184,6 +185,72 @@ async def test_create_activity_route_requires_link_and_logs_activity(app, monkey
 
 
 @pytest.mark.asyncio
+async def test_list_activities_includes_owner_name():
+    owner_id = uuid4()
+    activity = SimpleNamespace(
+        id=uuid4(),
+        type=ActivityType.call,
+        subject="Discovery call",
+        body="Discussed requirements",
+        outcome="Interested",
+        duration_minutes=30,
+        lead_id=None,
+        contact_id=uuid4(),
+        deal_id=None,
+        account_id=None,
+        owner_id=owner_id,
+        scheduled_at=None,
+        completed_at=None,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db = FakeSession([FakeResult(values=[(activity, "Maya Patel")])])
+
+    activities = await list_activities(db)
+
+    assert activities[0].owner_name == "Maya Patel"
+
+
+@pytest.mark.asyncio
+async def test_export_activities_csv_route_uses_activity_rows(app, monkeypatch):
+    owner = make_user()
+    app.dependency_overrides[get_current_user] = lambda: owner
+    activity_response = make_activity_response(owner_id=owner.id).model_copy(update={"owner_name": "Task Owner"})
+
+    async def fake_list_activities(db, **kwargs):
+        assert kwargs["page"] == 1
+        assert kwargs["page_size"] == 20
+        assert kwargs["owner_id"] == owner.id
+        return [activity_response]
+
+    monkeypatch.setattr(
+        activities_router_module.activities_service,
+        "list_activities",
+        fake_list_activities,
+    )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/activities/export/csv")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "activities.csv" in response.headers["content-disposition"]
+    assert "Task Owner" in response.text
+    assert "Discovery call" in response.text
+
+
+def test_activities_csv_does_not_fallback_to_owner_id():
+    owner_id = uuid4()
+    activity_response = make_activity_response(owner_id=owner_id)
+
+    csv_text = activities_to_csv([activity_response])
+
+    assert "Unknown owner" in csv_text
+    assert str(owner_id) not in csv_text
+
+
+@pytest.mark.asyncio
 async def test_complete_task_sets_status_and_completed_at():
     task = make_task()
     db = FakeSession([FakeResult(value=task)])
@@ -193,6 +260,35 @@ async def test_complete_task_sets_status_and_completed_at():
     assert completed.status == TaskStatus.completed
     assert completed.completed_at is not None
     assert db.committed is True
+
+
+@pytest.mark.asyncio
+async def test_overdue_task_service_includes_display_names():
+    task = make_task(due_at=datetime.now(timezone.utc) - timedelta(days=2))
+    db = FakeSession(
+        [
+            FakeResult(
+                values=[
+                    (
+                        task,
+                        "Maya Patel",
+                        "Ada",
+                        "Lovelace",
+                        None,
+                        None,
+                        "Acme Legal",
+                    )
+                ]
+            )
+        ]
+    )
+
+    tasks = await list_overdue_tasks(db)
+
+    assert tasks[0].owner_name == "Maya Patel"
+    assert tasks[0].assigned_to_name == "Maya Patel"
+    assert tasks[0].contact_name == "Ada Lovelace"
+    assert tasks[0].account_name == "Acme Legal"
 
 
 @pytest.mark.asyncio
@@ -229,7 +325,7 @@ async def test_email_logging_matches_contact_and_creates_activity():
         account_id=uuid4(),
         is_active=True,
     )
-    db = FakeSession([FakeResult(value=contact)])
+    db = FakeSession([FakeResult(value=contact), FakeResult(value=owner.full_name)])
 
     email_in = activities_router_module.EmailLogCreate(
         **{

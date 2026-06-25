@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     environment: Environment = Field(default="development", alias="ENVIRONMENT")
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_key: str = Field(alias="SUPABASE_KEY")
+    db_pool_size: int = Field(default=1, ge=1, le=20, alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=1, ge=0, le=40, alias="DB_MAX_OVERFLOW")
     resend_api_key: str | None = Field(default=None, alias="RESEND_API_KEY")
     resend_from_email: str = Field(default="crm@example.com", alias="RESEND_FROM_EMAIL")
     r2_endpoint_url: str | None = Field(default=None, alias="R2_ENDPOINT_URL")

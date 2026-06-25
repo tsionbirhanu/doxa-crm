@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { LayoutGrid, List, Plus } from "lucide-react";
+import { LayoutGrid, List, Plus, Target, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -84,12 +84,12 @@ export function DealsPageClient() {
         header: "Deal",
         id: "title",
       },
-      { cell: (deal) => deal.account_name ?? deal.account_id.slice(0, 8), header: "Account", id: "account" },
-      { cell: (deal) => deal.stage_name ?? deal.stage_id.slice(0, 8), header: "Stage", id: "stage" },
+      { cell: (deal) => deal.account_name ?? "Linked account", header: "Account", id: "account" },
+      { cell: (deal) => deal.stage_name ?? "Current stage", header: "Stage", id: "stage" },
       { cell: (deal) => formatCurrency(toNumber(deal.value), deal.currency), header: "Value", id: "value" },
       { cell: (deal) => <StatusPill status={deal.status} type="deal" />, header: "Status", id: "status" },
       { cell: (deal) => formatDate(deal.expected_close), header: "Expected Close", id: "expected_close" },
-      { cell: (deal) => deal.owner_name ?? deal.owner_id.slice(0, 8), header: "Owner", id: "owner" },
+      { cell: (deal) => deal.owner_name ?? "Unassigned", header: "Owner", id: "owner" },
     ],
     [],
   );
@@ -98,27 +98,29 @@ export function DealsPageClient() {
     <div className="grid gap-6">
       <PageHeader
         primaryAction={canWriteDeals ? { icon: Plus, label: "New Deal", onClick: () => setFormOpen(true) } : undefined}
-        subtitle="Manage pipeline stages, forecast, and opportunity movement."
-        title="Sales Pipeline"
+        subtitle="Track active opportunities, forecast value, and stage progress."
+        title="Deals"
       />
 
       <section className="rounded-xl bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {pipelinesQuery.isLoading ? <Skeleton className="h-10 w-48" /> : null}
-            {pipelines.map((pipeline) => (
-              <button
-                className={cn(
-                  "rounded-md px-3 py-2 text-sm font-semibold transition-colors",
-                  selectedPipelineId === pipeline.id ? "bg-[#2563EB] text-white" : "bg-[#EFF6FF] text-[#2563EB] hover:bg-blue-100",
-                )}
-                key={pipeline.id}
-                onClick={() => selectPipeline(pipeline.id)}
-                type="button"
+          <div className="min-w-0 sm:w-72">
+            {pipelinesQuery.isLoading ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (
+              <select
+                aria-label="Select pipeline"
+                className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm font-medium text-[#0F2444] shadow-sm"
+                onChange={(event) => selectPipeline(event.target.value)}
+                value={selectedPipelineId}
               >
-                {pipeline.name}
-              </button>
-            ))}
+                {pipelines.map((pipeline) => (
+                  <option key={pipeline.id} value={pipeline.id}>
+                    {pipeline.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="flex rounded-md border border-slate-200 bg-slate-50 p-1">
@@ -148,16 +150,34 @@ export function DealsPageClient() {
         </div>
       </section>
 
-      <section className="rounded-xl bg-[#0F2444] p-5 text-white shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-white/70">{selectedPipeline?.name ?? "Pipeline"} Forecast</p>
+      <section className="rounded-xl bg-white p-5 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[minmax(180px,1fr)_minmax(320px,1.4fr)] lg:items-center">
+          <div>
+            <h2 className="text-base font-semibold text-[#0F2444]">Forecast</h2>
+            <p className="mt-1 text-sm text-[#64748B]">{selectedPipeline?.name ?? "Selected pipeline"}</p>
+          </div>
           {forecastQuery.isLoading ? (
-            <Skeleton className="h-8 w-80 bg-white/20" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+            </div>
           ) : (
-            <p className="text-xl font-bold">
-              Weighted Forecast: {formatCurrency(forecastQuery.data?.total_weighted ?? 0)} | Total Open:{" "}
-              {formatCurrency(forecastQuery.data?.total_open ?? 0)}
-            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-blue-100 bg-[#EFF6FF] p-4">
+                <div className="flex items-center gap-2 text-xs font-medium text-[#64748B]">
+                  <TrendingUp className="h-4 w-4 text-[#2563EB]" aria-hidden="true" />
+                  Weighted Forecast
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-[#0F2444]">{formatCurrency(forecastQuery.data?.total_weighted ?? 0)}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2 text-xs font-medium text-[#64748B]">
+                  <Target className="h-4 w-4 text-[#0F2444]" aria-hidden="true" />
+                  Total Open
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-[#0F2444]">{formatCurrency(forecastQuery.data?.total_open ?? 0)}</p>
+              </div>
+            </div>
           )}
         </div>
       </section>

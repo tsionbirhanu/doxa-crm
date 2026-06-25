@@ -24,6 +24,7 @@ async def list_accounts(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     tier: AccountTier | None = None,
     owner_id: UUID | None = None,
+    search: Annotated[str | None, Query(max_length=255)] = None,
 ) -> list[AccountResponse]:
     return await accounts_service.list_accounts(
         db,
@@ -32,6 +33,7 @@ async def list_accounts(
         page_size=page_size,
         tier=tier,
         owner_id=owner_id,
+        search=search,
     )
 
 

@@ -103,18 +103,18 @@ export function LeadsTab() {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-xl bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-slate-200/70 bg-white p-4 shadow-sm">
         <DateRangeFilter onApply={setFilters} showOwner={false} value={filters} />
       </section>
 
       <ReportCard
         actions={
           <>
-            <div className="flex rounded-md border border-slate-200 bg-white p-1">
+            <div className="flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
               {(["source", "campaign", "week", "month"] satisfies LeadVolumeGroup[]).map((option) => (
                 <button
-                  className={`rounded px-3 py-1.5 text-xs font-medium ${
-                    groupBy === option ? "bg-[#2563EB] text-white" : "text-[#64748B] hover:bg-slate-50"
+                  className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                    groupBy === option ? "bg-[#0F2444] text-white" : "text-[#64748B] hover:bg-slate-50 hover:text-[#0F2444]"
                   }`}
                   key={option}
                   onClick={() => setGroupBy(option)}

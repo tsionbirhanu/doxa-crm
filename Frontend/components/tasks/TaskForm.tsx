@@ -184,7 +184,13 @@ export function TaskForm({ onOpenChange, onSaved, open, task }: TaskFormProps) {
               </div>
               <div>
                 <Label htmlFor="task_due_at">Due At</Label>
-                <Input id="task_due_at" disabled={submitting} type="datetime-local" {...form.register("due_at")} />
+                <Input
+                  className="[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100"
+                  id="task_due_at"
+                  disabled={submitting}
+                  type="datetime-local"
+                  {...form.register("due_at")}
+                />
               </div>
             </div>
             <div>

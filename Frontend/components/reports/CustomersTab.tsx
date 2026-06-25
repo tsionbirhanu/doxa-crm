@@ -73,8 +73,8 @@ export function CustomersTab() {
           {(["green", "yellow", "red"] satisfies Array<Exclude<HealthFilter, "">>).map((health) => (
             <button
               className={cn(
-                "rounded-xl border p-4 text-left transition hover:bg-slate-50",
-                healthFilter === health ? "border-[#2563EB] ring-2 ring-[#2563EB]/20" : "border-slate-100",
+                "rounded-lg border bg-white p-4 text-left transition-colors hover:border-slate-300 hover:bg-slate-50",
+                healthFilter === health ? "border-[#0F2444] ring-2 ring-[#0F2444]/10" : "border-slate-200",
               )}
               key={health}
               onClick={() => setHealthFilter((current) => (current === health ? "" : health))}
@@ -113,7 +113,7 @@ export function CustomersTab() {
                     <td className="px-3 py-3">{row.account_name ?? "Account"}</td>
                     <td className="px-3 py-3">{row.owner_name ?? "Unassigned"}</td>
                     <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-[#0F2444]">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-[#0F2444]">
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: healthColors[health] }} />
                         {healthLabels[health]}
                       </span>

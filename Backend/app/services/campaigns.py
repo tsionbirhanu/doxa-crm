@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -31,6 +33,8 @@ from app.schemas.campaigns import (
     CampaignStepUpdate,
     CampaignUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _pagination(page: int, page_size: int) -> tuple[int, int]:
@@ -165,6 +169,7 @@ async def activate_campaign(db: AsyncSession, campaign_id: UUID) -> CampaignResp
     campaign = await get_campaign_model(db, campaign_id)
     step_count = await _count_steps(db, campaign_id)
     enrollment_count = await _count_active_enrollments(db, campaign_id)
+    active_enrollment_ids = await _active_enrollment_ids(db, campaign_id)
 
     if step_count == 0 or enrollment_count == 0:
         raise HTTPException(
@@ -175,6 +180,10 @@ async def activate_campaign(db: AsyncSession, campaign_id: UUID) -> CampaignResp
     campaign.status = CampaignStatus.active
     await db.commit()
     await db.refresh(campaign)
+
+    for enrollment_id in active_enrollment_ids:
+        _schedule_campaign_step(enrollment_id)
+
     return await build_campaign_response(db, campaign)
 
 
@@ -201,6 +210,16 @@ async def _count_active_enrollments(db: AsyncSession, campaign_id: UUID) -> int:
         )
     )
     return int(result.scalar_one() or 0)
+
+
+async def _active_enrollment_ids(db: AsyncSession, campaign_id: UUID) -> list[UUID]:
+    result = await db.execute(
+        select(CampaignEnrollment.id).where(
+            CampaignEnrollment.campaign_id == campaign_id,
+            CampaignEnrollment.status == CampaignEnrollmentStatus.active,
+        )
+    )
+    return list(result.scalars().all())
 
 
 async def list_enrollments(
@@ -250,8 +269,10 @@ async def enroll_contacts(
     campaign_id: UUID,
     enroll_in: CampaignEnrollRequest,
 ) -> list[CampaignEnrollmentResponse]:
-    await get_campaign_model(db, campaign_id)
+    campaign = await get_campaign_model(db, campaign_id)
     enrollments: list[CampaignEnrollment] = []
+    enrollment_ids_to_schedule: list[UUID] = []
+    reenrolled_at = datetime.now(timezone.utc)
 
     for contact_id in enroll_in.contact_ids:
         contact_result = await db.execute(select(Contact).where(Contact.id == contact_id, Contact.is_active.is_(True)))
@@ -269,9 +290,12 @@ async def enroll_contacts(
             enrollment = CampaignEnrollment(campaign_id=campaign_id, contact_id=contact_id)
             db.add(enrollment)
             await db.flush()
-        else:
+            enrollment_ids_to_schedule.append(enrollment.id)
+        elif enrollment.status != CampaignEnrollmentStatus.active:
             enrollment.status = CampaignEnrollmentStatus.active
             enrollment.step_index = 0
+            enrollment.enrolled_at = reenrolled_at
+            enrollment_ids_to_schedule.append(enrollment.id)
         enrollments.append(enrollment)
 
     try:
@@ -280,12 +304,24 @@ async def enroll_contacts(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Campaign enrollment failed") from exc
 
-    for enrollment in enrollments:
-        from app.workers.campaign_tasks import process_campaign_step
-
-        process_campaign_step.apply_async(args=[str(enrollment.id)], countdown=0)
+    if campaign.status == CampaignStatus.active:
+        for enrollment_id in enrollment_ids_to_schedule:
+            _schedule_campaign_step(enrollment_id)
 
     return [await build_enrollment_response(db, enrollment) for enrollment in enrollments]
+
+
+def _schedule_campaign_step(enrollment_id: UUID) -> None:
+    try:
+        from app.workers.campaign_tasks import process_campaign_step
+
+        process_campaign_step.apply_async(args=[str(enrollment_id)], countdown=0)
+    except Exception:
+        logger.warning(
+            "Campaign enrollment saved but step processing could not be queued",
+            extra={"enrollment_id": str(enrollment_id)},
+            exc_info=True,
+        )
 
 
 async def unsubscribe_contact(

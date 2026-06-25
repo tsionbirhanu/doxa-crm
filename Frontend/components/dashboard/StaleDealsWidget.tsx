@@ -17,10 +17,6 @@ function getErrorMessage(error: unknown): string {
   return typeof apiError.detail === "string" ? apiError.detail : "Could not load stale deals.";
 }
 
-function shortId(id?: string | null): string {
-  return id ? id.slice(0, 8) : "Unassigned";
-}
-
 function toNumber(value: number | string): number {
   return typeof value === "number" ? value : Number(value);
 }
@@ -33,7 +29,7 @@ function StaleDealsSkeleton() {
   return (
     <div className="space-y-3">
       {[1, 2, 3, 4, 5].map((item) => (
-        <div className="rounded-lg border border-slate-100 p-3" key={item}>
+        <div className="rounded-lg border border-slate-200/70 p-3" key={item}>
           <Skeleton className="h-4 w-48" />
           <Skeleton className="mt-2 h-3 w-36" />
         </div>
@@ -52,15 +48,15 @@ export function StaleDealsWidget() {
   const deals = (data ?? []).slice(0, 5);
 
   return (
-    <section className="rounded-xl bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+    <section className="rounded-lg border border-slate-200/70 bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
         <div>
           <h2 className="text-base font-semibold text-[#0F2444]">Stale Deals</h2>
           <p className="mt-1 text-sm text-[#64748B]">Deals with no recent activity in 14+ days.</p>
         </div>
         {isError ? (
           <button
-            className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+            className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
             onClick={() => void refetch()}
             type="button"
           >
@@ -70,32 +66,34 @@ export function StaleDealsWidget() {
         ) : null}
       </div>
 
-      <div className="mt-5">
+      <div className="p-5">
         {isLoading ? (
           <StaleDealsSkeleton />
         ) : isError ? (
-          <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
+          <div className="rounded-lg border border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
             {getErrorMessage(error)}
           </div>
         ) : deals.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-[#64748B]">
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/40 p-6 text-center text-sm text-[#64748B]">
             No stale deals right now.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-3">
             {deals.map((deal) => (
               <Link
-                className="grid gap-3 py-3 transition-colors hover:bg-[#EFF6FF] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                className="grid gap-3 rounded-lg border border-slate-200/70 bg-white px-3 py-3 transition-colors hover:border-slate-300/80 hover:bg-slate-50/60 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 href={`/deals/${deal.id}`}
                 key={deal.id}
               >
-                <div className="min-w-0 px-2">
+                <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[#0F2444]">{deal.title}</p>
-                  <p className="mt-1 truncate text-xs text-[#64748B]">
-                    {deal.account_name ?? `Account ${shortId(deal.account_id)}`} • {deal.owner_name ?? `Owner ${shortId(deal.owner_id)}`}
+                  <p className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-[#64748B]">
+                    <span>{deal.account_name ?? "No account"}</span>
+                    <span className="text-slate-300">/</span>
+                    <span>{deal.owner_name ?? "Unassigned"}</span>
                   </p>
                 </div>
-                <div className="flex items-center justify-between gap-3 px-2 text-right sm:block">
+                <div className="flex items-center justify-between gap-3 text-right sm:block">
                   <p className="text-sm font-semibold text-[#0F2444]">{formatCurrency(toNumber(deal.value), deal.currency)}</p>
                   <p className="mt-1 text-xs font-medium text-amber-700">{daysSinceUpdate(deal)} days quiet</p>
                 </div>

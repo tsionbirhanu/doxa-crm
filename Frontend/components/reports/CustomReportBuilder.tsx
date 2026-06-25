@@ -43,6 +43,7 @@ interface BuilderFilter {
 
 const selectClassName =
   "h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50";
+const dateInputClassName = "[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
 
 const ENTITY_CONFIG: Record<CustomReportEntity, EntityConfig> = {
   activities: {
@@ -382,7 +383,7 @@ export function CustomReportBuilder() {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-xl bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-slate-200/70 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-[#0F2444]">Custom Report Builder</h2>
@@ -506,13 +507,13 @@ export function CustomReportBuilder() {
               <label className="text-sm font-medium text-[#0F2444]" htmlFor="custom-report-date-from">
                 From
               </label>
-              <Input id="custom-report-date-from" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
+              <Input className={dateInputClassName} id="custom-report-date-from" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-medium text-[#0F2444]" htmlFor="custom-report-date-to">
                 To
               </label>
-              <Input id="custom-report-date-to" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+              <Input className={dateInputClassName} id="custom-report-date-to" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
             </div>
           </div>
 
@@ -529,7 +530,7 @@ export function CustomReportBuilder() {
                   <label
                     className={cn(
                       "flex min-h-10 cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition",
-                      checked ? "border-[#2563EB] bg-[#EFF6FF] text-[#0F2444]" : "border-slate-200 text-[#64748B] hover:bg-slate-50",
+                      checked ? "border-[#0F2444] bg-slate-50 text-[#0F2444]" : "border-slate-200 text-[#64748B] hover:bg-slate-50",
                     )}
                     key={field.id}
                   >

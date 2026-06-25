@@ -19,7 +19,7 @@ function StatsRowSkeleton() {
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Loading dashboard stats">
       {["open-deals", "leads", "overdue", "activities"].map((item) => (
-        <div className="rounded-xl bg-white p-5 shadow-sm" key={item}>
+        <div className="rounded-lg border border-slate-200/70 bg-white p-5 shadow-sm" key={item}>
           <div className="flex items-start justify-between">
             <div className="space-y-3">
               <Skeleton className="h-4 w-28" />
@@ -47,11 +47,11 @@ export function StatsRow() {
 
   if (isError || !data) {
     return (
-      <div className="rounded-xl border border-red-100 bg-white p-5 text-sm text-red-700 shadow-sm">
+      <div className="rounded-lg border border-red-100 bg-white p-5 text-sm text-red-700 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span>{getErrorMessage(error)}</span>
           <button
-            className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+            className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
             onClick={() => void refetch()}
             type="button"
           >
@@ -72,7 +72,7 @@ export function StatsRow() {
 
   const stats = [
     {
-      accent: "bg-blue-50 text-[#2563EB]",
+      accent: "border-emerald-100 bg-emerald-50 text-emerald-700",
       icon: BadgeDollarSign,
       label: "Open Deals",
       trend: formatCurrency(data.open_deals_value),
@@ -80,7 +80,7 @@ export function StatsRow() {
       valueClassName: "text-[#0F2444]",
     },
     {
-      accent: "bg-blue-50 text-[#2563EB]",
+      accent: "border-sky-100 bg-sky-50 text-sky-700",
       icon: UserPlus,
       label: "Leads This Month",
       trend: leadTrendText,
@@ -90,7 +90,10 @@ export function StatsRow() {
       valueClassName: "text-[#0F2444]",
     },
     {
-      accent: data.overdue_tasks_count > 0 ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-500",
+      accent:
+        data.overdue_tasks_count > 0
+          ? "border-red-100 bg-red-50 text-red-600"
+          : "border-slate-200 bg-slate-50 text-slate-500",
       icon: AlertTriangle,
       label: "Overdue Tasks",
       trend: data.overdue_tasks_count > 0 ? "Needs attention" : "All clear",
@@ -98,7 +101,7 @@ export function StatsRow() {
       valueClassName: data.overdue_tasks_count > 0 ? "text-red-600" : "text-[#0F2444]",
     },
     {
-      accent: "bg-blue-50 text-[#2563EB]",
+      accent: "border-violet-100 bg-violet-50 text-violet-700",
       icon: Activity,
       label: "Activities This Week",
       trend: "Logged CRM touchpoints",
@@ -114,17 +117,17 @@ export function StatsRow() {
         const TrendIcon = stat.trendIcon;
 
         return (
-          <article className="rounded-xl bg-white p-5 shadow-sm" key={stat.label}>
+          <article className="min-h-[150px] rounded-lg border border-slate-200/70 bg-white p-5 shadow-sm transition-colors hover:border-slate-300/80" key={stat.label}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-[#64748B]">{stat.label}</p>
-                <p className={cn("mt-2 text-3xl font-bold tracking-normal", stat.valueClassName)}>{stat.value}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748B]">{stat.label}</p>
+                <p className={cn("mt-2 text-3xl font-semibold tracking-normal", stat.valueClassName)}>{stat.value}</p>
               </div>
-              <div className={cn("grid h-10 w-10 place-items-center rounded-lg", stat.accent)}>
+              <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-lg border", stat.accent)}>
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </div>
             </div>
-            <div className={cn("mt-4 flex items-center gap-1.5 text-xs font-medium", stat.trendTone ?? "text-[#64748B]")}>
+            <div className={cn("mt-5 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-xs font-medium", stat.trendTone ?? "text-[#64748B]")}>
               {TrendIcon ? <TrendIcon className="h-3.5 w-3.5" aria-hidden="true" /> : null}
               <span>{stat.trend}</span>
             </div>

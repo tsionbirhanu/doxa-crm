@@ -22,6 +22,10 @@ interface DateRangeFilterProps {
   onApply: (value: DateRangeFilterValue) => void;
 }
 
+const dateInputClassName = "[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
+const labelClassName = "text-xs font-medium text-[#64748B]";
+const selectClassName = "h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950 shadow-sm";
+
 export function defaultDateRange(): DateRangeFilterValue {
   const dateTo = new Date();
   const dateFrom = new Date();
@@ -48,33 +52,44 @@ export function DateRangeFilter({ onApply, ownerLabel = "Owner", showOwner = tru
   }, [value]);
 
   return (
-    <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-      <Input
-        aria-label="Date from"
-        onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value }))}
-        type="date"
-        value={draft.date_from}
-      />
-      <Input
-        aria-label="Date to"
-        onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value }))}
-        type="date"
-        value={draft.date_to}
-      />
+    <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+      <label className="grid gap-1.5">
+        <span className={labelClassName}>From</span>
+        <Input
+          aria-label="Date from"
+          className={dateInputClassName}
+          onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value }))}
+          type="date"
+          value={draft.date_from}
+        />
+      </label>
+      <label className="grid gap-1.5">
+        <span className={labelClassName}>To</span>
+        <Input
+          aria-label="Date to"
+          className={dateInputClassName}
+          onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value }))}
+          type="date"
+          value={draft.date_to}
+        />
+      </label>
       {showOwner ? (
-        <select
-          aria-label={ownerLabel}
-          className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
-          onChange={(event) => setDraft((current) => ({ ...current, owner_id: event.target.value }))}
-          value={draft.owner_id}
-        >
-          <option value="">All {ownerLabel.toLowerCase()}s</option>
-          {(usersQuery.data ?? []).map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.full_name}
-            </option>
-          ))}
-        </select>
+        <label className="grid gap-1.5">
+          <span className={labelClassName}>{ownerLabel}</span>
+          <select
+            aria-label={ownerLabel}
+            className={selectClassName}
+            onChange={(event) => setDraft((current) => ({ ...current, owner_id: event.target.value }))}
+            value={draft.owner_id}
+          >
+            <option value="">All {ownerLabel.toLowerCase()}s</option>
+            {(usersQuery.data ?? []).map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : (
         <span className="hidden md:block" />
       )}

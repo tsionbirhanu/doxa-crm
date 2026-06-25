@@ -18,25 +18,21 @@ function getErrorMessage(error: unknown): string {
   return typeof apiError.detail === "string" ? apiError.detail : "Could not load overdue tasks.";
 }
 
-function shortId(id?: string | null): string {
-  return id ? id.slice(0, 8) : "Unassigned";
-}
-
 function linkedEntityLabel(task: Task): string {
   if (task.contact_id) {
-    return `Contact ${shortId(task.contact_id)}`;
+    return task.contact_name ? `Contact: ${task.contact_name}` : "Contact";
   }
 
   if (task.deal_id) {
-    return `Deal ${shortId(task.deal_id)}`;
+    return task.deal_name ? `Deal: ${task.deal_name}` : "Deal";
   }
 
   if (task.lead_id) {
-    return `Lead ${shortId(task.lead_id)}`;
+    return task.lead_name ? `Lead: ${task.lead_name}` : "Lead";
   }
 
   if (task.account_id) {
-    return `Account ${shortId(task.account_id)}`;
+    return task.account_name ? `Account: ${task.account_name}` : "Account";
   }
 
   return "No linked record";
@@ -54,7 +50,7 @@ function OverdueTasksSkeleton() {
   return (
     <div className="space-y-3">
       {[1, 2, 3, 4, 5].map((item) => (
-        <div className="rounded-lg border border-slate-100 p-3" key={item}>
+        <div className="rounded-lg border border-slate-200/70 p-3" key={item}>
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-2">
               <Skeleton className="h-4 w-44" />
@@ -88,15 +84,15 @@ export function OverdueTasksList() {
   const tasks = (tasksQuery.data ?? []).slice(0, 5);
 
   return (
-    <section className="rounded-xl bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+    <section className="rounded-lg border border-slate-200/70 bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
         <div>
           <h2 className="text-base font-semibold text-[#0F2444]">Overdue Tasks</h2>
           <p className="mt-1 text-sm text-[#64748B]">The oldest overdue work that needs attention.</p>
         </div>
         {tasksQuery.isError ? (
           <button
-            className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+            className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
             onClick={() => void tasksQuery.refetch()}
             type="button"
           >
@@ -106,33 +102,39 @@ export function OverdueTasksList() {
         ) : null}
       </div>
 
-      <div className="mt-5">
+      <div className="p-5">
         {tasksQuery.isLoading ? (
           <OverdueTasksSkeleton />
         ) : tasksQuery.isError ? (
-          <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
+          <div className="rounded-lg border border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
             {getErrorMessage(tasksQuery.error)}
           </div>
         ) : tasks.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-[#64748B]">
-            No overdue tasks — you're on top of it.
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/40 p-6 text-center text-sm text-[#64748B]">
+            No overdue tasks - you're on top of it.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-3">
             {tasks.map((task) => {
               const daysOverdue = getDaysOverdue(task);
+              const ownerName = task.owner_name ?? task.assigned_to_name ?? "Unassigned";
 
               return (
-                <div className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" key={task.id}>
+                <div
+                  className="grid gap-3 rounded-lg border border-slate-200/70 bg-white px-3 py-3 transition-colors hover:border-slate-300/80 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  key={task.id}
+                >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-semibold text-[#0F2444]">{task.title}</p>
-                      <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">
+                      <span className="rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
                         {daysOverdue}d overdue
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-[#64748B]">
-                      {linkedEntityLabel(task)} • {task.assigned_to_name ?? `Owner ${shortId(task.owner_id)}`}
+                    <p className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-[#64748B]">
+                      <span>{linkedEntityLabel(task)}</span>
+                      <span className="text-slate-300">/</span>
+                      <span>Owner: {ownerName}</span>
                     </p>
                   </div>
                   {canWriteTasks ? (
@@ -140,6 +142,7 @@ export function OverdueTasksList() {
                       disabled={completeTask.isPending && completeTask.variables === task.id}
                       onClick={() => completeTask.mutate(task.id)}
                       size="sm"
+                      variant="outline"
                       type="button"
                     >
                       <Check className="h-3.5 w-3.5" aria-hidden="true" />

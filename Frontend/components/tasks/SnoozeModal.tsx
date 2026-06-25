@@ -47,7 +47,13 @@ export function SnoozeModal({ onOpenChange, open, task }: SnoozeModalProps) {
         <div className="grid gap-4">
           <div>
             <Label htmlFor="snooze_due">New due date</Label>
-            <Input id="snooze_due" onChange={(event) => setNewDue(event.target.value)} type="datetime-local" value={newDue} />
+            <Input
+              className="[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100"
+              id="snooze_due"
+              onChange={(event) => setNewDue(event.target.value)}
+              type="datetime-local"
+              value={newDue}
+            />
           </div>
           {snoozeTask.isError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not snooze task.</div> : null}
           <div className="flex justify-end gap-3">

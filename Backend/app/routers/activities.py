@@ -67,6 +67,44 @@ async def log_email_activity(
     return await activities_service.log_email_activity(db, email_in, current_user)
 
 
+@router.get("/export/csv")
+async def export_activities_csv(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    type_filter: ActivityType | None = Query(default=None, alias="type"),
+    owner_id: UUID | None = None,
+    lead_id: UUID | None = None,
+    contact_id: UUID | None = None,
+    deal_id: UUID | None = None,
+    account_id: UUID | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> Response:
+    if not is_manager(current_user):
+        owner_id = current_user.id
+
+    activities = await activities_service.list_activities(
+        db,
+        page=page,
+        page_size=page_size,
+        type_filter=type_filter,
+        owner_id=owner_id,
+        lead_id=lead_id,
+        contact_id=contact_id,
+        deal_id=deal_id,
+        account_id=account_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return Response(
+        content=activities_service.activities_to_csv(activities),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="activities.csv"'},
+    )
+
+
 @router.get("/{activity_id}", response_model=ActivityResponse)
 async def get_activity(
     activity_id: UUID,

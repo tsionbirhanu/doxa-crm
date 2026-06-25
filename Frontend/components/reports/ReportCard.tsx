@@ -35,13 +35,13 @@ export function ReportCard({
   title,
 }: ReportCardProps) {
   return (
-    <section className="rounded-xl bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-[#0F2444]">{title}</h2>
-          {description ? <p className="mt-1 text-sm text-[#64748B]">{description}</p> : null}
+    <section className="overflow-hidden rounded-lg border border-slate-200/70 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-semibold text-[#0F2444]">{title}</h2>
+          {description ? <p className="mt-1 max-w-2xl text-sm leading-5 text-[#64748B]">{description}</p> : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {actions}
           {error && onRetry ? (
             <Button onClick={onRetry} size="sm" type="button" variant="outline">
@@ -52,7 +52,7 @@ export function ReportCard({
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="p-5 [&_tbody_tr:hover]:bg-slate-50/70 [&_thead]:bg-slate-50/80">
         {isLoading ? <Skeleton className={cn("w-full rounded-xl", skeletonClassName)} /> : null}
         {!isLoading && error ? (
           <div className={cn("flex items-center rounded-xl border border-red-100 bg-red-50/50 p-4 text-sm text-red-700", skeletonClassName)}>

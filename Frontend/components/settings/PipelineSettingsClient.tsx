@@ -217,8 +217,8 @@ export function PipelineSettingsClient() {
         title="Pipeline Settings"
       />
 
-      {pipelinesQuery.isLoading ? <div className="rounded-xl bg-white p-6 text-sm text-[#64748B] shadow-sm">Loading pipelines...</div> : null}
-      {pipelinesQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load pipelines.</div> : null}
+      {pipelinesQuery.isLoading ? <div className="rounded-lg border border-slate-200/70 bg-white p-4 text-sm text-[#64748B] shadow-sm sm:p-6">Loading pipelines...</div> : null}
+      {pipelinesQuery.isError ? <div className="rounded-lg border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load pipelines.</div> : null}
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="grid gap-4">
@@ -227,12 +227,12 @@ export function PipelineSettingsClient() {
             const editing = editingPipelineId === pipeline.id;
 
             return (
-              <section className="overflow-hidden rounded-xl bg-white shadow-sm" key={pipeline.id}>
-                <header className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
+              <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200/70 bg-white shadow-sm" key={pipeline.id}>
+                <header className="flex flex-col gap-3 border-b border-slate-200 p-3 sm:p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 items-start gap-2 sm:items-center sm:gap-3">
                     <button
                       aria-label={isExpanded ? "Collapse pipeline" : "Expand pipeline"}
-                      className="grid h-8 w-8 place-items-center rounded-md text-[#64748B] hover:bg-slate-100"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[#64748B] hover:bg-slate-100"
                       onClick={() => toggleExpanded(pipeline.id)}
                       type="button"
                     >
@@ -241,7 +241,7 @@ export function PipelineSettingsClient() {
                     {editing ? (
                       <Input
                         autoFocus
-                        className="max-w-sm"
+                        className="w-full max-w-sm"
                         onBlur={() => savePipelineName(pipeline)}
                         onChange={(event) => setPipelineNameDraft(event.target.value)}
                         onKeyDown={(event) => {
@@ -256,7 +256,7 @@ export function PipelineSettingsClient() {
                       />
                     ) : (
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <h2 className="truncate text-lg font-semibold text-[#0F2444]">{pipeline.name}</h2>
                           {pipeline.is_default ? (
                             <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-xs font-semibold text-[#2563EB]">Default</span>
@@ -266,14 +266,15 @@ export function PipelineSettingsClient() {
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                     {canAdminPipeline ? (
                       <>
-                        <Button onClick={() => beginPipelineEdit(pipeline)} size="sm" type="button" variant="outline">
+                        <Button className="w-full sm:w-auto" onClick={() => beginPipelineEdit(pipeline)} size="sm" type="button" variant="outline">
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                           Edit Name
                         </Button>
                         <Button
+                          className="w-full sm:w-auto"
                           disabled={pipeline.is_default || deletePipeline.isPending}
                           onClick={() => deletePipelineIfAllowed(pipeline)}
                           size="sm"
@@ -290,10 +291,10 @@ export function PipelineSettingsClient() {
                 </header>
 
                 {isExpanded ? (
-                  <div className="grid gap-3 p-4">
+                  <div className="grid gap-3 p-3 sm:p-4">
                     <Droppable droppableId={pipeline.id} isDropDisabled={!canAdminPipeline}>
                       {(provided) => (
-                        <div className="grid gap-3" ref={provided.innerRef} {...provided.droppableProps}>
+                        <div className="grid min-w-0 gap-3" ref={provided.innerRef} {...provided.droppableProps}>
                           {pipeline.stages.map((stage, index) => (
                             <Draggable draggableId={stage.id} index={index} isDragDisabled={!canAdminPipeline} key={stage.id}>
                               {(draggableProvided, snapshot) => {
@@ -318,7 +319,7 @@ export function PipelineSettingsClient() {
                     </Droppable>
 
                     {canAdminPipeline && addingPipelineId === pipeline.id ? (
-                      <div className="grid gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_140px_auto_auto]">
+                      <div className="grid gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_140px] lg:grid-cols-[1fr_140px_auto_auto]">
                         <Input
                           aria-label="New stage name"
                           onChange={(event) => setAddDraft((current) => ({ ...current, name: event.target.value }))}
@@ -342,7 +343,7 @@ export function PipelineSettingsClient() {
                         </Button>
                       </div>
                     ) : canAdminPipeline ? (
-                      <Button className="justify-self-start" onClick={() => showAddStage(pipeline.id)} type="button" variant="outline">
+                      <Button className="w-full justify-self-start sm:w-auto" onClick={() => showAddStage(pipeline.id)} type="button" variant="outline">
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Add Stage
                       </Button>

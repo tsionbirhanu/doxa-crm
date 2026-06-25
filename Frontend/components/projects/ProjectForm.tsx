@@ -21,6 +21,7 @@ const projectFormSchema = z.object({
   owner_id: z.string().optional(),
   start_date: z.string().min(1, "Start date is required."),
 });
+const dateInputClassName = "[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
 
 type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
@@ -193,12 +194,12 @@ export function ProjectForm({ onOpenChange, onSaved, open, project }: ProjectFor
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="project_start_date">Start Date</Label>
-                <Input id="project_start_date" disabled={submitting} type="date" {...form.register("start_date")} />
+                <Input className={dateInputClassName} id="project_start_date" disabled={submitting} type="date" {...form.register("start_date")} />
                 {fieldError(form.formState.errors.start_date?.message)}
               </div>
               <div>
                 <Label htmlFor="project_end_date">End Date</Label>
-                <Input id="project_end_date" disabled={submitting} type="date" {...form.register("end_date")} />
+                <Input className={dateInputClassName} id="project_end_date" disabled={submitting} type="date" {...form.register("end_date")} />
                 {fieldError(form.formState.errors.end_date?.message)}
               </div>
             </div>

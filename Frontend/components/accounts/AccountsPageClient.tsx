@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Plus } from "lucide-react";
+import { Building2, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -9,6 +9,7 @@ import { AccountForm } from "@/components/accounts/AccountForm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { cn, formatCurrency } from "@/lib/utils";
 import { usePermissions } from "@/lib/permissions";
@@ -18,6 +19,7 @@ const PAGE_SIZE = 20;
 
 interface AccountFilters {
   owner_id: string;
+  search: string;
   tier: string;
 }
 
@@ -44,6 +46,7 @@ function toQueryParams(page: number, filters: AccountFilters) {
     owner_id: filters.owner_id || undefined,
     page,
     page_size: PAGE_SIZE,
+    search: filters.search || undefined,
     tier: filters.tier || undefined,
   };
 }
@@ -51,7 +54,7 @@ function toQueryParams(page: number, filters: AccountFilters) {
 export function AccountsPageClient() {
   const { canWriteAccounts } = usePermissions();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<AccountFilters>({ owner_id: "", tier: "" });
+  const [filters, setFilters] = useState<AccountFilters>({ owner_id: "", search: "", tier: "" });
   const [formOpen, setFormOpen] = useState(false);
 
   const accountsQuery = useQuery({
@@ -90,7 +93,7 @@ export function AccountsPageClient() {
         id: "deal_value",
       },
       {
-        cell: (account) => account.owner_name ?? account.owner_id.slice(0, 8),
+        cell: (account) => account.owner_name ?? "Unassigned",
         header: "Owner",
         id: "owner",
       },
@@ -107,14 +110,23 @@ export function AccountsPageClient() {
     <div className="grid gap-6">
       <PageHeader
         primaryAction={canWriteAccounts ? { icon: Plus, label: "New Account", onClick: () => setFormOpen(true) } : undefined}
-        subtitle="Manage companies, linked contacts, and deal value."
+        subtitle="Review customer companies, ownership, contacts, and pipeline value."
         title="Accounts"
       />
 
       <section className="rounded-xl bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-[minmax(240px,1.4fr)_minmax(160px,1fr)_minmax(160px,1fr)]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" aria-hidden="true" />
+            <Input
+              className="pl-9"
+              onChange={(event) => updateFilter("search", event.target.value)}
+              placeholder="Search accounts"
+              value={filters.search}
+            />
+          </div>
           <select
-            className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+            className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
             onChange={(event) => updateFilter("tier", event.target.value)}
             value={filters.tier}
           >
@@ -126,7 +138,7 @@ export function AccountsPageClient() {
             ))}
           </select>
           <select
-            className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+            className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
             onChange={(event) => updateFilter("owner_id", event.target.value)}
             value={filters.owner_id}
           >

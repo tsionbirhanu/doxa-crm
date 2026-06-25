@@ -46,6 +46,10 @@ function activityIcon(type: string) {
   return Activity;
 }
 
+function stageLabel(stageId: string): string {
+  return stageId ? "Stage change" : "Unknown stage";
+}
+
 export function DealDetailClient({ dealId }: DealDetailClientProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -142,7 +146,7 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
               <StatusPill status={deal.status} type="deal" />
             </div>
             <p className="mt-1 text-sm text-[#64748B]">
-              {deal.account_name ?? "Account"} - {deal.contact_name ?? "Contact"}
+              {deal.account_name ?? "Linked account"} - {deal.contact_name ?? "Primary contact"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -203,7 +207,7 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#0F2444]">Activity Timeline</h2>
-              <p className="mt-1 text-sm text-[#64748B]">Calls, emails, meetings, and notes.</p>
+              <p className="mt-1 text-sm text-[#64748B]">Recent touchpoints, follow-ups, and deal work.</p>
             </div>
             {canWriteActivities ? (
               <Button onClick={() => setActivityOpen(true)} type="button" variant="outline">
@@ -219,7 +223,7 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
 
         <aside className="grid gap-4 content-start">
           <section className="rounded-xl bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-[#0F2444]">Deal Info</h2>
+            <h2 className="text-base font-semibold text-[#0F2444]">Deal Details</h2>
             <dl className="mt-4 grid gap-3 text-sm">
               <div>
                 <dt className="text-[#64748B]">Value</dt>
@@ -243,14 +247,14 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
           <section className="rounded-xl bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-[#0F2444]">Account</h2>
             <Link className="mt-3 block font-semibold text-[#2563EB] hover:underline" href={`/accounts/${deal.account_id}`}>
-              {deal.account_name ?? deal.account_id.slice(0, 8)}
+              {deal.account_name ?? "Linked account"}
             </Link>
           </section>
 
           <section className="rounded-xl bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-[#0F2444]">Contact</h2>
             <Link className="mt-3 block font-semibold text-[#2563EB] hover:underline" href={`/contacts/${deal.contact_id}`}>
-              {deal.contact_name ?? deal.contact_id.slice(0, 8)}
+              {deal.contact_name ?? "Primary contact"}
             </Link>
           </section>
 
@@ -272,7 +276,7 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
                     {getInitials(collaborator.user_name ?? collaborator.role)}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[#0F2444]">{collaborator.user_name ?? collaborator.user_id.slice(0, 8)}</p>
+                    <p className="text-sm font-semibold text-[#0F2444]">{collaborator.user_name ?? "Team member"}</p>
                     <p className="text-xs text-[#64748B]">{collaborator.role}</p>
                   </div>
                 </div>
@@ -292,7 +296,7 @@ export function DealDetailClient({ dealId }: DealDetailClientProps) {
                   <div className="rounded-lg border border-slate-100 p-3 text-sm" key={history.id}>
                     <div className="flex items-center gap-2 text-[#0F2444]">
                       <CheckCircle2 className="h-4 w-4 text-[#2563EB]" aria-hidden="true" />
-                      <span>{stageNameById.get(history.to_stage_id) ?? history.to_stage_id.slice(0, 8)}</span>
+                      <span>{stageNameById.get(history.to_stage_id) ?? stageLabel(history.to_stage_id)}</span>
                     </div>
                     <p className="mt-1 text-xs text-[#64748B]">{formatDate(history.created_at)}</p>
                     {history.note ? <p className="mt-2 text-xs text-slate-700">{history.note}</p> : null}

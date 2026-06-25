@@ -143,11 +143,12 @@ async def test_list_accounts_route_supports_pagination_and_filters(app, monkeypa
     owner_id = uuid4()
     account_response = make_account_response()
 
-    async def fake_list_accounts(db, current_user, *, page, page_size, tier, owner_id: UUID | None):
+    async def fake_list_accounts(db, current_user, *, page, page_size, tier, owner_id: UUID | None, search: str | None):
         assert page == 2
         assert page_size == 5
         assert tier == AccountTier.smb
         assert owner_id is not None
+        assert search == "Acme"
         return [account_response]
 
     monkeypatch.setattr(accounts_router_module.accounts_service, "list_accounts", fake_list_accounts)
@@ -155,7 +156,7 @@ async def test_list_accounts_route_supports_pagination_and_filters(app, monkeypa
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get(
-            f"/api/v1/accounts/?page=2&page_size=5&tier=smb&owner_id={owner_id}"
+            f"/api/v1/accounts/?page=2&page_size=5&tier=smb&owner_id={owner_id}&search=Acme"
         )
 
     assert response.status_code == 200

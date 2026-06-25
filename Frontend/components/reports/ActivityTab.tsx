@@ -63,7 +63,7 @@ function buildActivityRows(rows: ActivityVolumeRow[], ownerId: string): Activity
   rows
     .filter((row) => !ownerId || row.rep_id === ownerId)
     .forEach((row) => {
-      const rep = row.rep_name ?? row.rep_id?.slice(0, 8) ?? "Unassigned";
+      const rep = row.rep_name ?? "Unassigned";
       const existing = byRep.get(rep) ?? emptyActivityRow(rep);
       const key = activityKey(row.activity_type);
       existing[key] += row.count;
@@ -107,7 +107,7 @@ export function ActivityTab() {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-xl bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-slate-200/70 bg-white p-4 shadow-sm">
         <DateRangeFilter onApply={setFilters} ownerLabel="Rep" value={filters} />
       </section>
 
@@ -164,7 +164,7 @@ export function ActivityTab() {
               {overdueTasks.map((task) => (
                 <tr className="border-t border-slate-100" key={task.id}>
                   <td className="px-3 py-3 font-medium text-[#0F2444]">{task.title}</td>
-                  <td className="px-3 py-3">{task.assignee_name ?? task.owner_id.slice(0, 8)}</td>
+                  <td className="px-3 py-3">{task.assignee_name ?? "Unassigned"}</td>
                   <td className="px-3 py-3 text-red-700">{formatDate(task.due_at)}</td>
                   <td className="px-3 py-3">
                     <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">{daysOverdue(task.due_at)} days</span>

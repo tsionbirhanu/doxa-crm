@@ -291,7 +291,13 @@ export function DealForm({ deal, onOpenChange, onSaved, open, selectedPipelineId
 
             <div>
               <Label htmlFor="expected_close">Expected Close</Label>
-              <Input id="expected_close" disabled={submitting} type="date" {...form.register("expected_close")} />
+              <Input
+                className="[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100"
+                id="expected_close"
+                disabled={submitting}
+                type="date"
+                {...form.register("expected_close")}
+              />
               {fieldError(form.formState.errors.expected_close?.message)}
             </div>
 

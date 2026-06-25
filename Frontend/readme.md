@@ -76,6 +76,7 @@ BETTER_AUTH_SECRET=<must-match-backend-SECRET_KEY>
 BETTER_AUTH_URL=http://localhost:3000
 NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 DATABASE_URL=postgresql://...
+BETTER_AUTH_DB_POOL_MAX=2
 ```
 
 Important:
@@ -83,6 +84,7 @@ Important:
 - `BETTER_AUTH_SECRET` must be exactly the same as backend `SECRET_KEY`
 - Frontend `DATABASE_URL` must be a normal `postgresql://` URL for the `pg` package
 - Backend `DATABASE_URL` uses `postgresql+asyncpg://`
+- `BETTER_AUTH_DB_POOL_MAX` should stay small for Supabase session-pool development
 - Do not put Meilisearch keys in the frontend env
 - Do not commit `.env`
 
@@ -338,8 +340,8 @@ Public page:
 
 - User management
 - Pipeline configuration
-- Integrations placeholder
-- Billing placeholder
+- Integrations page
+- Billing page
 
 ## API Client
 
@@ -374,7 +376,7 @@ White: #FFFFFF
 Common UI rules:
 
 - White cards on sky background
-- Rounded-xl cards with shadow-sm
+- Subtle borders, restrained shadows, and compact card radius
 - Lucide icons
 - Reusable `StatusPill`
 - Reusable `DataTable`

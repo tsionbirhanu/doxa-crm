@@ -1,13 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Download, Plus } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, Edit, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { ActivityForm } from "@/components/activities/ActivityForm";
 import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,8 @@ import { formatDate } from "@/lib/utils";
 import type { Account, Activity, ActivityType, Contact, Deal, Lead, User } from "@/types/api";
 
 const PAGE_SIZE = 20;
+const selectClassName = "h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950";
+const dateInputClassName = "[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
 
 interface ActivityFilters {
   account_id: string;
@@ -70,15 +73,18 @@ function downloadCsv(csv: string) {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = "activity-volume.csv";
+  link.download = "activities.csv";
   link.click();
   URL.revokeObjectURL(url);
 }
 
 export function ActivitiesPageClient() {
+  const queryClient = useQueryClient();
   const { canWriteActivities } = usePermissions();
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [deletingActivity, setDeletingActivity] = useState<Activity | null>(null);
   const [filters, setFilters] = useState<ActivityFilters>({
     account_id: "",
     contact_id: "",
@@ -101,6 +107,16 @@ export function ActivitiesPageClient() {
   const contactsQuery = useQuery({ queryFn: () => api.get<Contact[]>("/contacts/", { page_size: 100 }), queryKey: ["contacts", "activity-options"] });
   const dealsQuery = useQuery({ queryFn: () => api.get<Deal[]>("/deals/", { page_size: 100 }), queryKey: ["deals", "activity-options"] });
   const accountsQuery = useQuery({ queryFn: () => api.get<Account[]>("/accounts/", { page_size: 100 }), queryKey: ["accounts", "activity-options"] });
+  const deleteActivity = useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/activities/${id}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["activities"] });
+      void queryClient.invalidateQueries({ queryKey: ["contacts", "timeline"] });
+      void queryClient.invalidateQueries({ queryKey: ["deals"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads", "activities"] });
+      setDeletingActivity(null);
+    },
+  });
 
   const userMap = useMemo(() => new Map((usersQuery.data ?? []).map((user) => [user.id, user.full_name])), [usersQuery.data]);
   const leadMap = useMemo(() => new Map((leadsQuery.data ?? []).map((lead) => [lead.id, lead.full_name])), [leadsQuery.data]);
@@ -132,23 +148,53 @@ export function ActivitiesPageClient() {
         header: "Linked To",
         id: "linked",
       },
-      { cell: (activity) => userMap.get(activity.owner_id) ?? activity.owner_id.slice(0, 8), header: "Owner", id: "owner" },
+      { cell: (activity) => activity.owner_name ?? userMap.get(activity.owner_id) ?? "Unassigned", header: "Owner", id: "owner" },
       { cell: (activity) => (activity.scheduled_at ? formatDate(activity.scheduled_at) : "None"), header: "Scheduled At", id: "scheduled" },
       { cell: (activity) => activity.outcome ?? "None", header: "Outcome", id: "outcome" },
       { cell: (activity) => formatDate(activity.created_at), header: "Created", id: "created" },
+      {
+        cell: (activity) =>
+          canWriteActivities ? (
+            <div className="flex items-center gap-1.5">
+              <Button onClick={() => setEditingActivity(activity)} size="icon" type="button" variant="ghost">
+                <Edit className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Edit activity</span>
+              </Button>
+              <Button className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setDeletingActivity(activity)} size="icon" type="button" variant="ghost">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Delete activity</span>
+              </Button>
+            </div>
+          ) : null,
+        header: "",
+        id: "actions",
+      },
     ],
-    [accountMap, contactMap, dealMap, leadMap, userMap],
+    [accountMap, canWriteActivities, contactMap, dealMap, leadMap, userMap],
   );
 
   function updateFilter(key: keyof ActivityFilters, value: string) {
     setPage(1);
-    setFilters((current) => ({ ...current, [key]: value }));
+    setFilters((current) => {
+      if (key === "linked_type") {
+        return {
+          ...current,
+          account_id: "",
+          contact_id: "",
+          deal_id: "",
+          lead_id: "",
+          linked_type: value as ActivityFilters["linked_type"],
+        };
+      }
+
+      return { ...current, [key]: value };
+    });
   }
 
   async function exportActivityCsv() {
     setExporting(true);
     try {
-      const csv = await api.get<string>("/reports/export/csv", { report: "activity-volume" });
+      const csv = await api.get<string>("/activities/export/csv", toQueryParams(page, filters));
       downloadCsv(csv);
     } finally {
       setExporting(false);
@@ -163,21 +209,21 @@ export function ActivitiesPageClient() {
         title="Activities"
       />
 
-      <section className="rounded-xl bg-white p-4 shadow-sm">
+      <section className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-4">
-          <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("type", event.target.value)} value={filters.type}>
+          <select className={selectClassName} onChange={(event) => updateFilter("type", event.target.value)} value={filters.type}>
             <option value="">All types</option>
             {activityTypes.map((type) => <option key={type} value={type}>{optionLabel(type)}</option>)}
           </select>
-          <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("owner_id", event.target.value)} value={filters.owner_id}>
+          <select className={selectClassName} onChange={(event) => updateFilter("owner_id", event.target.value)} value={filters.owner_id}>
             <option value="">All owners</option>
             {(usersQuery.data ?? []).map((user) => <option key={user.id} value={user.id}>{user.full_name}</option>)}
           </select>
-          <Input onChange={(event) => updateFilter("date_from", event.target.value)} type="date" value={filters.date_from} />
-          <Input onChange={(event) => updateFilter("date_to", event.target.value)} type="date" value={filters.date_to} />
+          <Input className={dateInputClassName} onChange={(event) => updateFilter("date_from", event.target.value)} type="date" value={filters.date_from} />
+          <Input className={dateInputClassName} onChange={(event) => updateFilter("date_to", event.target.value)} type="date" value={filters.date_to} />
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
-          <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("linked_type", event.target.value)} value={filters.linked_type}>
+          <select className={selectClassName} onChange={(event) => updateFilter("linked_type", event.target.value)} value={filters.linked_type}>
             <option value="">Any linked entity</option>
             <option value="lead">Lead</option>
             <option value="contact">Contact</option>
@@ -185,25 +231,25 @@ export function ActivitiesPageClient() {
             <option value="account">Account</option>
           </select>
           {filters.linked_type === "lead" ? (
-            <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("lead_id", event.target.value)} value={filters.lead_id}>
+            <select className={selectClassName} onChange={(event) => updateFilter("lead_id", event.target.value)} value={filters.lead_id}>
               <option value="">All leads</option>
               {(leadsQuery.data ?? []).map((lead) => <option key={lead.id} value={lead.id}>{lead.full_name}</option>)}
             </select>
           ) : null}
           {filters.linked_type === "contact" ? (
-            <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("contact_id", event.target.value)} value={filters.contact_id}>
+            <select className={selectClassName} onChange={(event) => updateFilter("contact_id", event.target.value)} value={filters.contact_id}>
               <option value="">All contacts</option>
               {(contactsQuery.data ?? []).map((contact) => <option key={contact.id} value={contact.id}>{contactName(contact)}</option>)}
             </select>
           ) : null}
           {filters.linked_type === "deal" ? (
-            <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("deal_id", event.target.value)} value={filters.deal_id}>
+            <select className={selectClassName} onChange={(event) => updateFilter("deal_id", event.target.value)} value={filters.deal_id}>
               <option value="">All deals</option>
               {(dealsQuery.data ?? []).map((deal) => <option key={deal.id} value={deal.id}>{deal.title}</option>)}
             </select>
           ) : null}
           {filters.linked_type === "account" ? (
-            <select className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm" onChange={(event) => updateFilter("account_id", event.target.value)} value={filters.account_id}>
+            <select className={selectClassName} onChange={(event) => updateFilter("account_id", event.target.value)} value={filters.account_id}>
               <option value="">All accounts</option>
               {(accountsQuery.data ?? []).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
             </select>
@@ -228,7 +274,37 @@ export function ActivitiesPageClient() {
       />
 
       {activitiesQuery.isError ? <div className="rounded-xl border border-red-100 bg-white p-4 text-sm text-red-700 shadow-sm">Could not load activities.</div> : null}
-      {canWriteActivities ? <ActivityForm onOpenChange={setFormOpen} open={formOpen} /> : null}
+      {canWriteActivities ? (
+        <>
+          <ActivityForm onOpenChange={setFormOpen} open={formOpen} />
+          <ActivityForm
+            activity={editingActivity}
+            onOpenChange={(open) => {
+              if (!open) {
+                setEditingActivity(null);
+              }
+            }}
+            open={Boolean(editingActivity)}
+          />
+          <ConfirmDialog
+            confirmLabel="Delete"
+            description="Delete this activity log. This cannot be undone."
+            isPending={deleteActivity.isPending}
+            onConfirm={() => {
+              if (deletingActivity) {
+                deleteActivity.mutate(deletingActivity.id);
+              }
+            }}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDeletingActivity(null);
+              }
+            }}
+            open={Boolean(deletingActivity)}
+            title="Delete activity"
+          />
+        </>
+      ) : null}
     </div>
   );
 }

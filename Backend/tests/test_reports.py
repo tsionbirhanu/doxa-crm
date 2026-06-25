@@ -28,7 +28,15 @@ from app.dependencies import get_current_user, get_db
 from app.main import create_app
 from app.models import UserRoleName
 import app.routers.reports as reports_router_module
-from app.schemas.reports import CustomReportRequest, CustomReportResponse
+from app.schemas.reports import (
+    CustomReportRequest,
+    CustomReportResponse,
+    DealVelocityRow,
+    ForecastMonthRow,
+    LeadResponseTimeRow,
+    OverdueTaskRow,
+    WinLossRow,
+)
 from app.services import reports as reports_service
 
 
@@ -195,6 +203,97 @@ async def test_custom_builder_uses_whitelisted_fields():
     assert report.columns == ["title", "value", "status"]
     assert report.total == 2
     assert report.rows[0] == ["Acme Renewal", 12000.0, "open"]
+
+
+@pytest.mark.asyncio
+async def test_report_exports_hide_internal_ids(monkeypatch):
+    stage_id = uuid4()
+    rep_id = uuid4()
+    task_id = uuid4()
+
+    async def fake_deal_velocity(db, **kwargs):
+        return [DealVelocityRow(stage_id=stage_id, stage="Proposal Sent", avg_days=2.5)]
+
+    async def fake_lead_response_time(db):
+        return [LeadResponseTimeRow(rep_id=rep_id, rep_name="Amina Reed", avg_hours=1.75)]
+
+    async def fake_overdue_tasks(db):
+        return [
+            OverdueTaskRow(
+                id=task_id,
+                title="Follow up on Acme legal review",
+                due_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+                owner_id=rep_id,
+                assignee_name="Amina Reed",
+            )
+        ]
+
+    monkeypatch.setattr(reports_service, "deal_velocity", fake_deal_velocity)
+    monkeypatch.setattr(reports_service, "lead_response_time", fake_lead_response_time)
+    monkeypatch.setattr(reports_service, "overdue_tasks", fake_overdue_tasks)
+
+    columns, rows = await reports_service.report_rows_for_export(object(), "deal-velocity", {})
+    assert columns == ["Stage", "Avg Days"]
+    assert rows == [["Proposal Sent", 2.5]]
+    assert str(stage_id) not in reports_service.rows_to_csv(columns, rows)
+
+    columns, rows = await reports_service.report_rows_for_export(object(), "lead-response-time", {})
+    assert columns == ["Rep", "Avg Hours"]
+    assert rows == [["Amina Reed", 1.75]]
+    assert str(rep_id) not in reports_service.rows_to_csv(columns, rows)
+
+    columns, rows = await reports_service.report_rows_for_export(object(), "overdue-tasks", {})
+    assert columns == ["Title", "Due Date", "Assignee"]
+    assert rows[0][0] == "Follow up on Acme legal review"
+    assert rows[0][2] == "Amina Reed"
+    exported_csv = reports_service.rows_to_csv(columns, rows)
+    assert str(task_id) not in exported_csv
+    assert str(rep_id) not in exported_csv
+
+
+@pytest.mark.asyncio
+async def test_sales_report_exports_forward_filters(monkeypatch):
+    pipeline_id = uuid4()
+    owner_id = uuid4()
+    params = {
+        "pipeline_id": pipeline_id,
+        "owner_id": owner_id,
+        "date_from": date(2026, 6, 1),
+        "date_to": date(2026, 6, 30),
+    }
+    calls = {}
+
+    async def fake_win_loss(db, **kwargs):
+        calls["win_loss"] = kwargs
+        return [WinLossRow(group="Amina Reed", status="won", count=2, value=5000)]
+
+    async def fake_forecast(db, **kwargs):
+        calls["forecast"] = kwargs
+        return [ForecastMonthRow(month="2026-06", count=2, open_value=8000, weighted_value=4000)]
+
+    monkeypatch.setattr(reports_service, "win_loss", fake_win_loss)
+    monkeypatch.setattr(reports_service, "forecast", fake_forecast)
+
+    await reports_service.report_rows_for_export(object(), "win-loss", {**params, "group_by": "owner"})
+    await reports_service.report_rows_for_export(object(), "forecast", params)
+
+    assert calls["win_loss"] == {"group_by": "owner", **params}
+    assert calls["forecast"] == params
+
+
+def test_pdf_export_builds_wrapped_report_table():
+    content = reports_router_module._build_pdf(
+        "overdue-tasks",
+        ["Task", "Assignee", "Due Date", "Linked To"],
+        [[
+            "Follow up on a very long legal review task title that should wrap inside the PDF table",
+            "Amina Reed",
+            "2026-06-01",
+            "Contact: Acme Legal Operations and Procurement Review Committee",
+        ]],
+    )
+
+    assert content.startswith(b"%PDF")
 
 
 @pytest.mark.asyncio

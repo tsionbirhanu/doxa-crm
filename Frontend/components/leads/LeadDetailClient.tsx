@@ -48,7 +48,7 @@ function lifecycleItems(lead: Lead) {
 
   if (lead.converted_at) {
     items.push({
-      detail: "Converted leads cannot move back to an earlier status.",
+      detail: "Converted into a contact record.",
       label: "Converted",
       timestamp: lead.converted_at,
     });
@@ -118,6 +118,7 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
     subject: activity.subject,
     type: activity.type,
   }));
+  const hasAttribution = Boolean(lead.campaign_id || lead.utm_source || lead.utm_campaign || lead.utm_medium);
 
   return (
     <div className="grid gap-6">
@@ -169,7 +170,7 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <section className="rounded-xl bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-[#0F2444]">Status History</h2>
-          <p className="mt-1 text-sm text-[#64748B]">Lifecycle events available on this lead record.</p>
+          <p className="mt-1 text-sm text-[#64748B]">Created, updated, and conversion moments.</p>
           <div className="mt-5 space-y-4">
             {lifecycleItems(lead).map((item) => (
               <article className="flex gap-4 rounded-xl border border-slate-100 p-4" key={`${item.label}-${item.timestamp}`}>
@@ -189,7 +190,7 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-[#0F2444]">Activities</h2>
-                <p className="mt-1 text-sm text-[#64748B]">Logged work against this lead.</p>
+                <p className="mt-1 text-sm text-[#64748B]">Calls, emails, meetings, and notes.</p>
               </div>
               {canWriteActivities ? (
                 <Button onClick={() => setActivityOpen(true)} size="sm" type="button" variant="outline">
@@ -222,24 +223,41 @@ export function LeadDetailClient({ leadId }: LeadDetailClientProps) {
               </div>
               <div>
                 <dt className="text-[#64748B]">Assigned To</dt>
-                <dd className="mt-1 font-medium text-[#0F2444]">{lead.assigned_to_name ?? lead.assigned_to.slice(0, 8)}</dd>
+                <dd className="mt-1 font-medium text-[#0F2444]">{lead.assigned_to_name ?? "Unassigned"}</dd>
               </div>
-              <div>
-                <dt className="text-[#64748B]">Campaign</dt>
-                <dd className="mt-1 font-medium text-[#0F2444]">{lead.campaign_id ?? "None"}</dd>
-              </div>
-              <div>
-                <dt className="text-[#64748B]">UTM Source</dt>
-                <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_source ?? "None"}</dd>
-              </div>
-              <div>
-                <dt className="text-[#64748B]">UTM Campaign</dt>
-                <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_campaign ?? "None"}</dd>
-              </div>
-              <div>
-                <dt className="text-[#64748B]">UTM Medium</dt>
-                <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_medium ?? "None"}</dd>
-              </div>
+              {hasAttribution ? (
+                <>
+                  {lead.campaign_id ? (
+                    <div>
+                      <dt className="text-[#64748B]">Campaign ID</dt>
+                      <dd className="mt-1 break-all font-medium text-[#0F2444]">{lead.campaign_id}</dd>
+                    </div>
+                  ) : null}
+                  {lead.utm_source ? (
+                    <div>
+                      <dt className="text-[#64748B]">UTM Source</dt>
+                      <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_source}</dd>
+                    </div>
+                  ) : null}
+                  {lead.utm_campaign ? (
+                    <div>
+                      <dt className="text-[#64748B]">UTM Campaign</dt>
+                      <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_campaign}</dd>
+                    </div>
+                  ) : null}
+                  {lead.utm_medium ? (
+                    <div>
+                      <dt className="text-[#64748B]">UTM Medium</dt>
+                      <dd className="mt-1 font-medium text-[#0F2444]">{lead.utm_medium}</dd>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div>
+                  <dt className="text-[#64748B]">Attribution</dt>
+                  <dd className="mt-1 font-medium text-[#0F2444]">No attribution data</dd>
+                </div>
+              )}
             </dl>
           </section>
 

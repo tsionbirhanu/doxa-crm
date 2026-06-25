@@ -9,7 +9,6 @@ import { ActivityForm } from "@/components/activities/ActivityForm";
 import { ContactForm } from "@/components/contacts/ContactForm";
 import { ActivityTimeline, contactTimelineToActivityItems } from "@/components/shared/ActivityTimeline";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { StatusPill } from "@/components/shared/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
@@ -18,6 +17,7 @@ import { usePermissions } from "@/lib/permissions";
 import type { Account, Contact, ContactTimelineItem } from "@/types/api";
 
 type TimelineFilter = "all" | "calls" | "emails" | "tasks" | "deals";
+const hiddenCustomFieldKeys = new Set(["converted_from_lead_id"]);
 
 interface ContactDetailClientProps {
   contactId: string;
@@ -91,7 +91,14 @@ function timelineMatchesFilter(item: ContactTimelineItem, filter: TimelineFilter
 }
 
 function customFieldEntries(contact?: Contact): Array<[string, string | number | boolean]> {
-  return Object.entries(contact?.custom_fields ?? {});
+  return Object.entries(contact?.custom_fields ?? {}).filter(([key]) => !hiddenCustomFieldKeys.has(key));
+}
+
+function formatLabel(value: string): string {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
@@ -168,6 +175,8 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
     return <div className="rounded-xl border border-red-100 bg-white p-5 text-sm text-red-700 shadow-sm">Could not load contact.</div>;
   }
 
+  const contactSummary = [contact.title, contact.account_name ? `at ${contact.account_name}` : null].filter(Boolean).join(" ");
+
   return (
     <div className="grid gap-6">
       <section className="rounded-xl bg-white p-6 shadow-sm">
@@ -176,9 +185,7 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
             <h1 className="text-2xl font-semibold tracking-normal text-[#0F2444]">
               {contact.first_name} {contact.last_name}
             </h1>
-            <p className="mt-1 text-sm text-[#64748B]">
-              {contact.title} {contact.account_name ? `at ${contact.account_name}` : ""}
-            </p>
+            <p className="mt-1 text-sm text-[#64748B]">{contactSummary || contact.email}</p>
             {tags.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {tags.map((tag) => (
@@ -216,8 +223,8 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
         <section className="rounded-xl bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-[#0F2444]">Activity Timeline</h2>
-              <p className="mt-1 text-sm text-[#64748B]">Calls, emails, tasks, notes, and deals.</p>
+              <h2 className="text-base font-semibold text-[#0F2444]">Timeline</h2>
+              <p className="mt-1 text-sm text-[#64748B]">Recent customer touchpoints and related work.</p>
             </div>
           </div>
 
@@ -248,11 +255,11 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
               </div>
               <div>
                 <dt className="text-[#64748B]">Owner</dt>
-                <dd className="mt-1 font-medium text-[#0F2444]">{contact.owner_name ?? contact.owner_id.slice(0, 8)}</dd>
+                <dd className="mt-1 font-medium text-[#0F2444]">{contact.owner_name ?? "Unassigned"}</dd>
               </div>
               {customFieldEntries(contact).map(([key, value]) => (
                 <div key={key}>
-                  <dt className="text-[#64748B]">{key}</dt>
+                  <dt className="text-[#64748B]">{formatLabel(key)}</dt>
                   <dd className="mt-1 font-medium text-[#0F2444]">{String(value)}</dd>
                 </div>
               ))}
@@ -268,7 +275,9 @@ export function ContactDetailClient({ contactId }: ContactDetailClientProps) {
                 </Link>
                 {accountQuery.data ? (
                   <div className="mt-3">
-                    <StatusPill status={accountQuery.data.tier} type="lead" />
+                    <span className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-[#64748B]">
+                      {formatLabel(accountQuery.data.tier)}
+                    </span>
                   </div>
                 ) : null}
               </div>

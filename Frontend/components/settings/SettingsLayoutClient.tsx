@@ -40,21 +40,21 @@ export function SettingsLayoutClient({ children }: SettingsLayoutClientProps) {
   }, [allowed, isLoading, router]);
 
   if (isLoading) {
-    return <div className="rounded-xl bg-white p-6 text-sm text-[#64748B] shadow-sm">Checking permissions...</div>;
+    return <div className="rounded-lg border border-slate-200/70 bg-white p-4 text-sm text-[#64748B] shadow-sm sm:p-6">Checking permissions...</div>;
   }
 
   if (!allowed) {
-    return <div className="rounded-xl bg-white p-6 text-sm text-[#64748B] shadow-sm">Redirecting to dashboard...</div>;
+    return <div className="rounded-lg border border-slate-200/70 bg-white p-4 text-sm text-[#64748B] shadow-sm sm:p-6">Redirecting to dashboard...</div>;
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-      <aside className="rounded-xl bg-white p-3 shadow-sm">
-        <div className="px-3 py-2">
+    <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="min-w-0 rounded-lg border border-slate-200/70 bg-white p-3 shadow-sm lg:sticky lg:top-6 lg:self-start">
+        <div className="px-1 py-1 sm:px-3 sm:py-2">
           <h1 className="text-lg font-semibold text-[#0F2444]">Settings</h1>
           <p className="mt-1 text-sm text-[#64748B]">Workspace configuration</p>
         </div>
-        <nav className="mt-3 grid gap-1">
+        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:grid lg:gap-1 lg:overflow-visible lg:pb-0" aria-label="Settings sections">
           {settingsLinks.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -62,7 +62,7 @@ export function SettingsLayoutClient({ children }: SettingsLayoutClientProps) {
             return (
               <Link
                 className={cn(
-                  "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
+                  "flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition lg:gap-3",
                   active ? "bg-[#EFF6FF] text-[#2563EB]" : "text-[#64748B] hover:bg-slate-50 hover:text-[#0F2444]",
                 )}
                 href={item.href}

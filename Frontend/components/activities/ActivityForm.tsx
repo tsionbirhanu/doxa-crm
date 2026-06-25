@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import type { Account, Activity, ActivityCreate, Contact, Deal, Lead } from "@/types/api";
+import type { Account, Activity, ActivityCreate, ActivityUpdate, Contact, Deal, Lead } from "@/types/api";
 
 const activityTypes = ["call", "email", "meeting", "note"] as const;
 
@@ -44,6 +44,7 @@ export interface ActivityInitialLink {
 }
 
 interface ActivityFormProps {
+  activity?: Activity | null;
   initialLink?: ActivityInitialLink;
   onOpenChange: (open: boolean) => void;
   onSaved?: (activity: Activity) => void;
@@ -80,6 +81,21 @@ function emptyValues(initialLink?: ActivityInitialLink): ActivityFormValues {
   };
 }
 
+function valuesFromActivity(activity: Activity): ActivityFormValues {
+  return {
+    account_id: activity.account_id ?? "",
+    body: activity.body,
+    contact_id: activity.contact_id ?? "",
+    deal_id: activity.deal_id ?? "",
+    duration_minutes: activity.duration_minutes ? String(activity.duration_minutes) : "",
+    lead_id: activity.lead_id ?? "",
+    outcome: activity.outcome ?? "",
+    scheduled_at: activity.scheduled_at ? activity.scheduled_at.slice(0, 16) : nowForInput(),
+    subject: activity.subject,
+    type: activity.type === "task" ? "call" : activity.type,
+  };
+}
+
 function fieldError(message?: string) {
   return message ? <p className="mt-1 text-xs text-red-600">{message}</p> : null;
 }
@@ -88,7 +104,7 @@ function toIsoOrNull(value?: string): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
-function buildPayload(values: ActivityFormValues, initialLink?: ActivityInitialLink): ActivityCreate {
+function buildPayload(values: ActivityFormValues, initialLink?: ActivityInitialLink): ActivityCreate | ActivityUpdate {
   if (initialLink) {
     return {
       account_id: initialLink.type === "account" ? initialLink.id : null,
@@ -131,7 +147,7 @@ function linkedRecordLabel(initialLink: ActivityInitialLink): string {
   return initialLink.label ? `${type}: ${initialLink.label}` : `${type}: ${initialLink.id.slice(0, 8)}`;
 }
 
-export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: ActivityFormProps) {
+export function ActivityForm({ activity, initialLink, onOpenChange, onSaved, open }: ActivityFormProps) {
   const queryClient = useQueryClient();
   const [leadSearch, setLeadSearch] = useState("");
   const [contactSearch, setContactSearch] = useState(initialLink?.type === "contact" ? initialLink.label ?? "" : "");
@@ -142,20 +158,20 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
   const debouncedDealSearch = useDebouncedValue(dealSearch, 300);
   const debouncedAccountSearch = useDebouncedValue(accountSearch, 300);
   const form = useForm<ActivityFormValues>({
-    defaultValues: emptyValues(initialLink),
+    defaultValues: activity ? valuesFromActivity(activity) : emptyValues(initialLink),
     resolver: zodResolver(activityFormSchema),
   });
   const selectedType = form.watch("type");
 
   useEffect(() => {
     if (open) {
-      form.reset(emptyValues(initialLink));
+      form.reset(activity ? valuesFromActivity(activity) : emptyValues(initialLink));
       setLeadSearch(initialLink?.type === "lead" ? initialLink.label ?? "" : "");
       setContactSearch(initialLink?.type === "contact" ? initialLink.label ?? "" : "");
       setDealSearch(initialLink?.type === "deal" ? initialLink.label ?? "" : "");
       setAccountSearch(initialLink?.type === "account" ? initialLink.label ?? "" : "");
     }
-  }, [form, initialLink, open]);
+  }, [activity, form, initialLink, open]);
 
   const leadsQuery = useQuery({
     enabled: !initialLink,
@@ -198,7 +214,14 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
   }, [accountsQuery.data, debouncedAccountSearch]);
 
   const saveActivity = useMutation({
-    mutationFn: (values: ActivityFormValues) => api.post<Activity, ActivityCreate>("/activities/", buildPayload(values, initialLink)),
+    mutationFn: (values: ActivityFormValues) => {
+      const payload = buildPayload(values, initialLink);
+      if (activity) {
+        return api.patch<Activity, ActivityUpdate>(`/activities/${activity.id}`, payload as ActivityUpdate);
+      }
+
+      return api.post<Activity, ActivityCreate>("/activities/", payload as ActivityCreate);
+    },
     onSuccess: (activity) => {
       void queryClient.invalidateQueries({ queryKey: ["activities"] });
       void queryClient.invalidateQueries({ queryKey: ["contacts", "timeline"] });
@@ -219,13 +242,19 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Log Activity</DialogTitle>
-          <DialogDescription>Record a call, email, meeting, or note and link it to CRM records.</DialogDescription>
+          <DialogTitle>{activity ? "Edit Activity" : "Log Activity"}</DialogTitle>
+          <DialogDescription>
+            {activity
+              ? "Update this activity log."
+              : initialLink
+                ? "Record a call, email, meeting, or note for this record."
+                : "Record a call, email, meeting, or note."}
+          </DialogDescription>
         </DialogHeader>
         <form className="grid gap-5" onSubmit={form.handleSubmit((values) => saveActivity.mutate(values))}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="activity_type">Type</Label>
+          <div>
+            <Label htmlFor="activity_type">Type</Label>
+            <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <select
                 className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
                 disabled={submitting}
@@ -238,10 +267,10 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="flex items-end gap-2 text-sm text-[#64748B]">
-              <ActivityTypeIcon className="h-5 w-5 text-[#2563EB]" type={selectedType} />
-              {optionLabel(selectedType)}
+              <div className="inline-flex h-10 min-w-28 items-center justify-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-left text-sm font-medium text-[#64748B]">
+                <ActivityTypeIcon className="h-5 w-5 shrink-0 text-[#2563EB]" type={selectedType} />
+                <span>{optionLabel(selectedType)}</span>
+              </div>
             </div>
           </div>
 
@@ -262,10 +291,16 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
             {fieldError(form.formState.errors.body?.message)}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-[minmax(240px,1.25fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <div>
               <Label htmlFor="activity_scheduled_at">Scheduled At</Label>
-              <Input id="activity_scheduled_at" disabled={submitting} type="datetime-local" {...form.register("scheduled_at")} />
+              <Input
+                className="[color-scheme:light] [&::-webkit-calendar-picker-indicator]:h-5 [&::-webkit-calendar-picker-indicator]:w-5 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100"
+                id="activity_scheduled_at"
+                disabled={submitting}
+                type="datetime-local"
+                {...form.register("scheduled_at")}
+              />
             </div>
             <div>
               <Label htmlFor="activity_outcome">Outcome</Label>
@@ -346,7 +381,7 @@ export function ActivityForm({ initialLink, onOpenChange, onSaved, open }: Activ
             </Button>
             <Button className="bg-[#2563EB] hover:bg-blue-700" disabled={submitting} type="submit">
               <Save className="h-4 w-4" aria-hidden="true" />
-              Save Activity
+              {activity ? "Update Activity" : "Save Activity"}
             </Button>
           </div>
         </form>

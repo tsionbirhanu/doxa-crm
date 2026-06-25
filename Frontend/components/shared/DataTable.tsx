@@ -52,10 +52,10 @@ function paginationLabel(pagination: DataTablePagination, currentCount: number):
   const end = (pagination.page - 1) * pagination.pageSize + currentCount;
 
   if (pagination.total !== undefined) {
-    return `${start}-${Math.min(end, pagination.total)} of ${pagination.total}`;
+    return `Showing ${start}-${Math.min(end, pagination.total)} of ${pagination.total}`;
   }
 
-  return `${start}-${end}`;
+  return `Showing ${start}-${end}`;
 }
 
 export function DataTable<TData>({
@@ -70,6 +70,12 @@ export function DataTable<TData>({
   const loadingRows = Array.from({ length: pagination?.pageSize ? Math.min(pagination.pageSize, 8) : 8 }, (_, index) => index);
   const hasNextPage =
     pagination?.hasNextPage ?? (pagination?.total !== undefined ? pagination.page * pagination.pageSize < pagination.total : false);
+  const hasMultiplePages = Boolean(
+    pagination &&
+      (pagination.page > 1 ||
+        hasNextPage ||
+        (pagination.total !== undefined && pagination.total > pagination.pageSize)),
+  );
 
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm">
@@ -127,7 +133,7 @@ export function DataTable<TData>({
         </table>
       </div>
 
-      {pagination ? (
+      {pagination && hasMultiplePages ? (
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
           <p className="text-sm text-[#64748B]">{paginationLabel(pagination, data.length)}</p>
           <div className="flex items-center gap-2">

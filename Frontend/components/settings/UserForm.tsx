@@ -142,11 +142,11 @@ export function UserForm({ onOpenChange, onSaved, open, user }: UserFormProps) {
 
           {saveUser.isError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not save user.</div> : null}
 
-          <div className="flex justify-end gap-3">
-            <Button disabled={submitting} onClick={() => onOpenChange(false)} type="button" variant="outline">
+          <div className="grid gap-3 sm:flex sm:justify-end">
+            <Button className="w-full sm:w-auto" disabled={submitting} onClick={() => onOpenChange(false)} type="button" variant="outline">
               Cancel
             </Button>
-            <Button disabled={submitting} type="submit">
+            <Button className="w-full sm:w-auto" disabled={submitting} type="submit">
               <Save className="h-4 w-4" aria-hidden="true" />
               Save User
             </Button>

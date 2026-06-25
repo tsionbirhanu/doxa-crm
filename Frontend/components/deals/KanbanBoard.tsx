@@ -175,14 +175,14 @@ export function KanbanBoard({ canDrag = true, detailsById, stages }: KanbanBoard
                         {wonStage && stage.deals.length > 0 ? <Sparkles className="h-4 w-4 text-emerald-600" aria-hidden="true" /> : null}
                       </div>
                       <p className="mt-1 text-xs text-[#64748B]">
-                        {stage.deals.length} deals • {formatCurrency(stageValue(stage))}
+                        {stage.deals.length} deals - {formatCurrency(stageValue(stage))}
                       </p>
                     </div>
                     <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-[#64748B] ring-1 ring-slate-200">
                       {Math.round(stage.probability)}%
                     </span>
                   </div>
-                  {wonStage && stage.deals.length > 0 ? <p className="mt-2 text-xs font-medium text-emerald-700">Won momentum</p> : null}
+                  {wonStage && stage.deals.length > 0 ? <p className="mt-2 text-xs font-medium text-emerald-700">Closed won</p> : null}
                 </header>
 
                 <Droppable droppableId={stage.stage_id} isDropDisabled={!canDrag}>
@@ -193,7 +193,7 @@ export function KanbanBoard({ canDrag = true, detailsById, stages }: KanbanBoard
                       {...provided.droppableProps}
                     >
                       {stage.deals.map((deal: DealSummary, index) => (
-                        <Draggable draggableId={deal.id} index={index} isDragDisabled={!canDrag} key={deal.id}>
+                        <Draggable disableInteractiveElementBlocking draggableId={deal.id} index={index} isDragDisabled={!canDrag} key={deal.id}>
                           {(draggableProvided, draggableSnapshot) => {
                             const { style, ...draggableProps } = draggableProvided.draggableProps;
 

@@ -31,6 +31,10 @@ function contactName(contact: Contact): string {
   return `${contact.first_name} ${contact.last_name}`;
 }
 
+function isAlreadyEnrolled(enrollment?: CampaignEnrollment): boolean {
+  return Boolean(enrollment && enrollment.status !== "unsubscribed");
+}
+
 export function ContactSelectModal({ campaignId, onOpenChange, open }: ContactSelectModalProps) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -41,10 +45,19 @@ export function ContactSelectModal({ campaignId, onOpenChange, open }: ContactSe
     queryFn: () => api.get<Contact[]>("/contacts/", { page_size: 50, search: debouncedSearch || undefined }),
     queryKey: ["campaigns", "contact-select", debouncedSearch],
   });
+  const enrollmentsQuery = useQuery({
+    enabled: open,
+    queryFn: () => api.get<CampaignEnrollment[]>(`/campaigns/${campaignId}/enrollments`, { page_size: 100 }),
+    queryKey: ["campaigns", "enrollments", campaignId],
+  });
   const contacts = useMemo(() => {
     const normalized = debouncedSearch.toLowerCase();
     return (contactsQuery.data ?? []).filter((contact) => `${contactName(contact)} ${contact.email}`.toLowerCase().includes(normalized));
   }, [contactsQuery.data, debouncedSearch]);
+  const enrollmentMap = useMemo(
+    () => new Map((enrollmentsQuery.data ?? []).map((enrollment) => [enrollment.contact_id, enrollment])),
+    [enrollmentsQuery.data],
+  );
   const enrollContacts = useMutation({
     mutationFn: () =>
       api.post<CampaignEnrollment[], CampaignEnrollRequest>(`/campaigns/${campaignId}/enroll`, {
@@ -52,13 +65,19 @@ export function ContactSelectModal({ campaignId, onOpenChange, open }: ContactSe
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "detail", campaignId] });
       void queryClient.invalidateQueries({ queryKey: ["campaigns", "enrollments", campaignId] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "metrics", campaignId] });
       setSelectedIds(new Set());
       onOpenChange(false);
     },
   });
 
   function toggleContact(contactId: string, checked: boolean) {
+    if (isAlreadyEnrolled(enrollmentMap.get(contactId))) {
+      return;
+    }
+
     setSelectedIds((current) => {
       const next = new Set(current);
       if (checked) {
@@ -93,24 +112,47 @@ export function ContactSelectModal({ campaignId, onOpenChange, open }: ContactSe
           </div>
           <div className="flex items-center justify-between">
             <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-sm font-semibold text-[#2563EB]">{selectedIds.size} selected</span>
+            {enrollmentsQuery.isLoading ? <span className="text-xs text-[#64748B]">Checking current enrollments...</span> : null}
           </div>
           <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-200">
             {contactsQuery.isLoading ? <div className="p-4 text-sm text-[#64748B]">Loading contacts...</div> : null}
             {!contactsQuery.isLoading && contacts.length === 0 ? <div className="p-4 text-sm text-[#64748B]">No contacts found.</div> : null}
-            {contacts.map((contact) => (
-              <label className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-[#EFF6FF]" key={contact.id}>
-                <input
-                  checked={selectedIds.has(contact.id)}
-                  className="h-4 w-4 rounded border-slate-300"
-                  onChange={(event) => toggleContact(contact.id, event.target.checked)}
-                  type="checkbox"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-[#0F2444]">{contactName(contact)}</p>
-                  <p className="text-xs text-[#64748B]">{contact.email}</p>
-                </div>
-              </label>
-            ))}
+            {contacts.map((contact) => {
+              const enrollment = enrollmentMap.get(contact.id);
+              const alreadyEnrolled = isAlreadyEnrolled(enrollment);
+              const canReEnroll = enrollment?.status === "unsubscribed";
+
+              return (
+                <label
+                  className={`flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 ${
+                    alreadyEnrolled ? "cursor-not-allowed bg-slate-50" : "cursor-pointer hover:bg-[#EFF6FF]"
+                  }`}
+                  key={contact.id}
+                >
+                  <input
+                    checked={alreadyEnrolled || selectedIds.has(contact.id)}
+                    className="h-4 w-4 rounded border-slate-300"
+                    disabled={alreadyEnrolled}
+                    onChange={(event) => toggleContact(contact.id, event.target.checked)}
+                    type="checkbox"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#0F2444]">{contactName(contact)}</p>
+                    <p className="truncate text-xs text-[#64748B]">{contact.email}</p>
+                  </div>
+                  {alreadyEnrolled ? (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-[#64748B]">
+                      Already enrolled
+                    </span>
+                  ) : null}
+                  {canReEnroll ? (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      Re-enroll
+                    </span>
+                  ) : null}
+                </label>
+              );
+            })}
           </div>
           {enrollContacts.isError ? <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not enroll contacts.</div> : null}
           <div className="flex justify-end gap-3">

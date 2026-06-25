@@ -14,7 +14,7 @@ function StatsFallback() {
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {["open", "leads", "tasks", "activities"].map((item) => (
-        <div className="rounded-xl bg-white p-5 shadow-sm" key={item}>
+        <div className="rounded-lg border border-slate-200/70 bg-white p-5 shadow-sm" key={item}>
           <Skeleton className="h-4 w-28" />
           <Skeleton className="mt-3 h-8 w-20" />
           <Skeleton className="mt-4 h-4 w-32" />
@@ -26,20 +26,26 @@ function StatsFallback() {
 
 function ChartFallback() {
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm">
-      <Skeleton className="h-5 w-40" />
-      <Skeleton className="mt-2 h-4 w-56" />
-      <Skeleton className="mt-5 h-[280px] w-full rounded-xl" />
+    <div className="rounded-lg border border-slate-200/70 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-2 h-4 w-56" />
+      </div>
+      <div className="p-5">
+        <Skeleton className="h-[280px] w-full rounded-lg" />
+      </div>
     </div>
   );
 }
 
 function ListFallback() {
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm">
-      <Skeleton className="h-5 w-36" />
-      <Skeleton className="mt-2 h-4 w-64" />
-      <div className="mt-5 space-y-3">
+    <div className="rounded-lg border border-slate-200/70 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <Skeleton className="h-5 w-36" />
+        <Skeleton className="mt-2 h-4 w-64" />
+      </div>
+      <div className="space-y-3 p-5">
         {[1, 2, 3].map((item) => (
           <Skeleton className="h-16 w-full rounded-lg" key={item} />
         ))}
@@ -53,9 +59,11 @@ export default function DashboardPage() {
 
   return (
     <div className="grid gap-6">
-      <header>
+      <header className="flex flex-col gap-2 border-b border-slate-200/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-normal text-[#0F2444]">Dashboard</h1>
-        <p className="mt-1 text-sm text-[#64748B]">{today}</p>
+        <time className="text-sm font-medium text-[#64748B]" dateTime={new Date().toISOString()}>
+          {today}
+        </time>
       </header>
 
       <Suspense fallback={<StatsFallback />}>

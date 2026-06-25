@@ -2,8 +2,9 @@
 
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { GripVertical, Pause, Play, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, GripVertical, MailCheck, MousePointerClick, Pause, Play, Plus, Reply, Target, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -11,6 +12,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { CampaignForm } from "@/components/campaigns/CampaignForm";
 import { ContactSelectModal } from "@/components/campaigns/ContactSelectModal";
 import { SequenceStepForm } from "@/components/campaigns/SequenceStepForm";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +25,7 @@ import type {
   CampaignMetrics,
   CampaignSequenceStep,
   CampaignStepsReorderRequest,
+  CampaignUpdate,
 } from "@/types/api";
 
 type CampaignTab = "overview" | "sequence" | "enrollments" | "metrics";
@@ -73,6 +76,7 @@ function variantRows(steps: CampaignSequenceStep[]) {
 }
 
 export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { canWriteCampaigns } = usePermissions();
   const [tab, setTab] = useState<CampaignTab>("overview");
@@ -80,11 +84,14 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const [stepFormOpen, setStepFormOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<CampaignSequenceStep | null>(null);
   const [contactSelectOpen, setContactSelectOpen] = useState(false);
+  const [deleteCampaignOpen, setDeleteCampaignOpen] = useState(false);
 
   const campaignQuery = useQuery({
     queryFn: () => api.get<Campaign>(`/campaigns/${campaignId}`),
     queryKey: ["campaigns", "detail", campaignId],
+    refetchOnMount: "always",
   });
+  const campaign = campaignQuery.data;
   const stepsQuery = useQuery({
     queryFn: () => api.get<CampaignSequenceStep[]>(`/campaigns/${campaignId}/steps`),
     queryKey: ["campaigns", "steps", campaignId],
@@ -96,6 +103,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const metricsQuery = useQuery({
     queryFn: () => api.get<CampaignMetrics>(`/campaigns/${campaignId}/metrics`),
     queryKey: ["campaigns", "metrics", campaignId],
+    refetchInterval: campaign?.status === "active" ? 10000 : false,
+    refetchOnMount: "always",
   });
 
   const activateCampaign = useMutation({
@@ -103,6 +112,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       void queryClient.invalidateQueries({ queryKey: ["campaigns", "detail", campaignId] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "metrics", campaignId] });
     },
   });
   const pauseCampaign = useMutation({
@@ -110,6 +120,22 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       void queryClient.invalidateQueries({ queryKey: ["campaigns", "detail", campaignId] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "metrics", campaignId] });
+    },
+  });
+  const completeCampaign = useMutation({
+    mutationFn: () => api.patch<Campaign, CampaignUpdate>(`/campaigns/${campaignId}`, { status: "completed" }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "detail", campaignId] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "metrics", campaignId] });
+    },
+  });
+  const deleteCampaign = useMutation({
+    mutationFn: () => api.delete<void>(`/campaigns/${campaignId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      router.push("/campaigns");
     },
   });
   const reorderSteps = useMutation({
@@ -131,19 +157,20 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     mutationFn: (contactId: string) => api.delete<CampaignEnrollment>(`/campaigns/${campaignId}/enrollments/${contactId}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "detail", campaignId] });
       void queryClient.invalidateQueries({ queryKey: ["campaigns", "enrollments", campaignId] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "metrics", campaignId] });
     },
   });
 
-  const campaign = campaignQuery.data;
   const steps = stepsQuery.data ?? [];
   const enrollments = enrollmentsQuery.data ?? [];
   const metrics = metricsQuery.data ?? campaign?.metrics;
   const hasMetrics = Boolean(metrics && Object.values(metrics).some((value) => value > 0));
   const hasSteps = steps.length > 0;
-  const hasEnrollments = enrollments.length > 0;
-  const canActivate = hasSteps && hasEnrollments && campaign?.status !== "active";
-  const disabledActivationReason = !hasSteps ? "Add at least one sequence step before activating." : !hasEnrollments ? "Enroll contacts before activating." : "";
+  const hasActiveEnrollments = enrollments.some((enrollment) => enrollment.status === "active");
+  const canActivate = hasSteps && hasActiveEnrollments && campaign?.status !== "active" && campaign?.status !== "completed";
+  const disabledActivationReason = !hasSteps ? "Add at least one sequence step before activating." : !hasActiveEnrollments ? "Enroll active contacts before activating." : "";
   const sortedSteps = [...steps].sort((left, right) => left.step_index - right.step_index);
   const variantComparison = useMemo(() => variantRows(steps), [steps]);
 
@@ -187,7 +214,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-xl bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -195,23 +222,38 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <StatusPill status={campaign.status} type="campaign" />
               <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-xs font-medium text-[#2563EB]">{optionLabel(campaign.type)}</span>
             </div>
-            <p className="mt-2 text-sm text-[#64748B]">
-              {formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}
-            </p>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#64748B]">
+              <span>{formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}</span>
+              <span>{campaign.owner_name ?? "Unassigned owner"}</span>
+              <span>{campaign.enrollment_count} enrolled</span>
+            </div>
           </div>
           {canWriteCampaigns ? (
-            <Button onClick={() => setCampaignFormOpen(true)} type="button" variant="outline">
-              Edit Campaign
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setCampaignFormOpen(true)} type="button" variant="outline">
+                Edit Campaign
+              </Button>
+              {campaign.status === "draft" ? (
+                <Button
+                  className="border-red-100 text-red-700 hover:bg-red-50 hover:text-red-800"
+                  onClick={() => setDeleteCampaignOpen(true)}
+                  type="button"
+                  variant="outline"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Delete
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </section>
 
-      <section className="rounded-xl bg-white p-2 shadow-sm">
-        <div className="flex flex-wrap gap-2">
+      <section className="rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-1">
           {tabs.map((item) => (
             <button
-              className={cn("rounded-md px-4 py-2 text-sm font-semibold", tab === item.value ? "bg-[#2563EB] text-white" : "text-[#64748B] hover:bg-slate-100")}
+              className={cn("rounded-md px-4 py-2 text-sm font-semibold transition-colors", tab === item.value ? "bg-slate-100 text-[#0F2444]" : "text-[#64748B] hover:bg-slate-50 hover:text-[#0F2444]")}
               key={item.value}
               onClick={() => setTab(item.value)}
               type="button"
@@ -224,7 +266,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
 
       {tab === "overview" ? (
         <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <section className="rounded-xl bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-[#0F2444]">Campaign Info</h2>
             <dl className="mt-4 grid gap-3 text-sm">
               <div>
@@ -246,40 +288,78 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             </dl>
             {canWriteCampaigns ? (
               <div className="mt-5">
-                {campaign.status === "active" ? (
-                  <Button disabled={pauseCampaign.isPending} onClick={() => pauseCampaign.mutate()} type="button" variant="outline">
-                    <Pause className="h-4 w-4" aria-hidden="true" />
-                    Pause
-                  </Button>
+                {campaign.status === "completed" ? (
+                  <p className="text-sm font-medium text-[#64748B]">This campaign is completed.</p>
                 ) : (
-                  <div className="inline-flex" title={!canActivate ? disabledActivationReason : undefined}>
-                    <Button disabled={!canActivate || activateCampaign.isPending} onClick={() => activateCampaign.mutate()} type="button">
-                      <Play className="h-4 w-4" aria-hidden="true" />
-                      Activate
-                    </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {campaign.status === "active" ? (
+                      <Button disabled={pauseCampaign.isPending} onClick={() => pauseCampaign.mutate()} type="button" variant="outline">
+                        <Pause className="h-4 w-4" aria-hidden="true" />
+                        Pause
+                      </Button>
+                    ) : (
+                      <div className="inline-flex" title={!canActivate ? disabledActivationReason : undefined}>
+                        <Button disabled={!canActivate || activateCampaign.isPending} onClick={() => activateCampaign.mutate()} type="button">
+                          <Play className="h-4 w-4" aria-hidden="true" />
+                          {campaign.status === "paused" ? "Resume" : "Activate"}
+                        </Button>
+                      </div>
+                    )}
+                    {(campaign.status === "active" || campaign.status === "paused") ? (
+                      <Button disabled={completeCampaign.isPending} onClick={() => completeCampaign.mutate()} type="button" variant="outline">
+                        <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                        Mark Complete
+                      </Button>
+                    ) : null}
                   </div>
                 )}
-                {!canActivate && campaign.status !== "active" ? <p className="mt-2 text-xs text-amber-700">{disabledActivationReason}</p> : null}
+                {!canActivate && campaign.status !== "active" && campaign.status !== "completed" ? <p className="mt-2 text-xs text-amber-700">{disabledActivationReason}</p> : null}
               </div>
             ) : null}
           </section>
 
-          <section className="rounded-xl bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-[#0F2444]">Quick Metrics</h2>
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-[#0F2444]">Campaign Metrics</h2>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {(["sent", "opened", "clicked", "replied", "converted"] as const).map((key) => (
-                <div className="rounded-lg bg-[#EFF6FF] p-3" key={key}>
-                  <p className="text-xs font-medium text-[#64748B]">{optionLabel(key)}</p>
-                  <p className="mt-1 text-2xl font-bold text-[#0F2444]">{metrics?.[key] ?? 0}</p>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <MailCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  Sent emails
                 </div>
-              ))}
+                <p className="mt-1 text-2xl font-semibold text-[#0F2444]">{metrics?.sent ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-medium text-[#64748B]">Opened</p>
+                <p className="mt-1 text-2xl font-semibold text-[#0F2444]">{metrics?.opened ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <MousePointerClick className="h-3.5 w-3.5" aria-hidden="true" />
+                  Clicked
+                </div>
+                <p className="mt-1 text-2xl font-semibold text-[#0F2444]">{metrics?.clicked ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <Reply className="h-3.5 w-3.5" aria-hidden="true" />
+                  Replied
+                </div>
+                <p className="mt-1 text-2xl font-semibold text-[#0F2444]">{metrics?.replied ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <Target className="h-3.5 w-3.5" aria-hidden="true" />
+                  Converted
+                </div>
+                <p className="mt-1 text-2xl font-semibold text-[#0F2444]">{metrics?.converted ?? 0}</p>
+              </div>
             </div>
           </section>
         </div>
       ) : null}
 
       {tab === "sequence" ? (
-        <section className="rounded-xl bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-[#0F2444]">Email Sequence</h2>
@@ -318,7 +398,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                                   </button>
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <span className="rounded-full bg-[#2563EB] px-2.5 py-1 text-xs font-semibold text-white">Step {index + 1}</span>
+                                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-[#0F2444]">Step {index + 1}</span>
                                       <span className="text-xs font-medium text-[#64748B]">Delay: {step.delay_days} days after previous</span>
                                       {step.variant ? <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Variant {step.variant}</span> : null}
                                     </div>
@@ -350,7 +430,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       ) : null}
 
       {tab === "enrollments" ? (
-        <section className="rounded-xl bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-[#0F2444]">Enrollments</h2>
@@ -374,10 +454,12 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                 <span className="text-sm text-[#64748B]">Step {enrollment.step_index + 1}</span>
                 <StatusPill status={enrollment.status} type="campaign" />
                 <span className="text-sm text-[#64748B]">{formatDate(enrollment.enrolled_at)}</span>
-                {canWriteCampaigns ? (
+                {canWriteCampaigns && enrollment.status !== "unsubscribed" ? (
                   <Button disabled={unenrollContact.isPending} onClick={() => unenrollContact.mutate(enrollment.contact_id)} size="sm" type="button" variant="outline">
                     Unenroll
                   </Button>
+                ) : canWriteCampaigns ? (
+                  <span className="text-sm font-medium text-[#64748B]">Removed</span>
                 ) : null}
               </div>
             ))}
@@ -386,8 +468,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       ) : null}
 
       {tab === "metrics" ? (
-        <section className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-[#0F2444]">Metrics</h2>
+        <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+          <h2 className="text-base font-semibold text-[#0F2444]">Delivery Metrics</h2>
           {!hasMetrics ? (
             <div className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-[#64748B]">No data yet</div>
           ) : (
@@ -407,10 +489,10 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                 </ResponsiveContainer>
               </div>
               <div className="mt-5 grid gap-3 md:grid-cols-4">
-                <div className="rounded-lg bg-[#EFF6FF] p-3"><p className="text-xs text-[#64748B]">Open Rate</p><p className="text-xl font-bold text-[#0F2444]">{rate(metrics?.opened ?? 0, metrics?.sent ?? 0)}%</p></div>
-                <div className="rounded-lg bg-[#EFF6FF] p-3"><p className="text-xs text-[#64748B]">Click Rate</p><p className="text-xl font-bold text-[#0F2444]">{rate(metrics?.clicked ?? 0, metrics?.sent ?? 0)}%</p></div>
-                <div className="rounded-lg bg-[#EFF6FF] p-3"><p className="text-xs text-[#64748B]">Reply Rate</p><p className="text-xl font-bold text-[#0F2444]">{rate(metrics?.replied ?? 0, metrics?.sent ?? 0)}%</p></div>
-                <div className="rounded-lg bg-[#EFF6FF] p-3"><p className="text-xs text-[#64748B]">Conversion Rate</p><p className="text-xl font-bold text-[#0F2444]">{rate(metrics?.converted ?? 0, metrics?.sent ?? 0)}%</p></div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-xs text-[#64748B]">Open Rate</p><p className="text-xl font-semibold text-[#0F2444]">{rate(metrics?.opened ?? 0, metrics?.sent ?? 0)}%</p></div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-xs text-[#64748B]">Click Rate</p><p className="text-xl font-semibold text-[#0F2444]">{rate(metrics?.clicked ?? 0, metrics?.sent ?? 0)}%</p></div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-xs text-[#64748B]">Reply Rate</p><p className="text-xl font-semibold text-[#0F2444]">{rate(metrics?.replied ?? 0, metrics?.sent ?? 0)}%</p></div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-xs text-[#64748B]">Conversion Rate</p><p className="text-xl font-semibold text-[#0F2444]">{rate(metrics?.converted ?? 0, metrics?.sent ?? 0)}%</p></div>
               </div>
               <div className="mt-6">
                 <h3 className="text-sm font-semibold text-[#0F2444]">A/B Variant Comparison</h3>
@@ -446,6 +528,15 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             step={editingStep}
           />
           <ContactSelectModal campaignId={campaign.id} onOpenChange={setContactSelectOpen} open={contactSelectOpen} />
+          <ConfirmDialog
+            confirmLabel="Delete"
+            description="Delete this draft campaign and its sequence steps. This cannot be undone."
+            isPending={deleteCampaign.isPending}
+            onConfirm={() => deleteCampaign.mutate()}
+            onOpenChange={setDeleteCampaignOpen}
+            open={deleteCampaignOpen}
+            title="Delete campaign"
+          />
         </>
       ) : null}
     </div>

@@ -119,7 +119,7 @@ export function ContactsPageClient() {
       { accessor: "email", header: "Email", id: "email" },
       { accessor: "title", header: "Title", id: "title" },
       { cell: (contact) => renderTags(contact.tags), header: "Tags", id: "tags" },
-      { cell: (contact) => contact.owner_name ?? contact.owner_id.slice(0, 8), header: "Owner", id: "owner" },
+      { cell: (contact) => contact.owner_name ?? "Unassigned", header: "Owner", id: "owner" },
       { cell: (contact) => formatDate(contact.created_at), header: "Created", id: "created" },
       {
         cell: (contact) =>
@@ -153,46 +153,54 @@ export function ContactsPageClient() {
     <div className="grid gap-6">
       <PageHeader
         primaryAction={canWriteContacts ? { icon: Plus, label: "New Contact", onClick: () => setFormOpen(true) } : undefined}
-        subtitle="Manage people, ownership, tags, and account relationships."
+        subtitle="Keep customer contacts, owners, and account links organized."
         title="Contacts"
       />
 
       <section className="rounded-xl bg-white p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-[minmax(240px,1.5fr)_minmax(160px,1fr)_minmax(160px,1fr)_minmax(140px,0.8fr)]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" aria-hidden="true" />
-            <Input
-              className="pl-9"
-              onChange={(event) => updateFilter("search", event.target.value)}
-              placeholder="Search name or email"
-              value={filters.search}
-            />
+          <div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" aria-hidden="true" />
+              <Input
+                className="pl-9"
+                onChange={(event) => updateFilter("search", event.target.value)}
+                placeholder="Name, email, or company"
+                value={filters.search}
+              />
+            </div>
           </div>
-          <select
-            className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
-            onChange={(event) => updateFilter("account_id", event.target.value)}
-            value={filters.account_id}
-          >
-            <option value="">All accounts</option>
-            {(accountsQuery.data ?? []).map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
-            onChange={(event) => updateFilter("owner_id", event.target.value)}
-            value={filters.owner_id}
-          >
-            <option value="">All owners</option>
-            {(usersQuery.data ?? []).map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.full_name}
-              </option>
-            ))}
-          </select>
-          <Input onChange={(event) => updateFilter("tag", event.target.value)} placeholder="Tag" value={filters.tag} />
+          <div>
+            <select
+              className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+              onChange={(event) => updateFilter("account_id", event.target.value)}
+              value={filters.account_id}
+            >
+              <option value="">All accounts</option>
+              {(accountsQuery.data ?? []).map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <select
+              className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+              onChange={(event) => updateFilter("owner_id", event.target.value)}
+              value={filters.owner_id}
+            >
+              <option value="">All owners</option>
+              {(usersQuery.data ?? []).map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Input onChange={(event) => updateFilter("tag", event.target.value)} placeholder="Tag name" value={filters.tag} />
+          </div>
         </div>
       </section>
 

@@ -463,6 +463,7 @@ export interface Activity extends LinkedEntityIds {
   outcome?: string | null;
   duration_minutes?: number | null;
   owner_id: UUID;
+  owner_name?: string | null;
   scheduled_at?: ISODateTime | null;
   completed_at?: ISODateTime | null;
   created_at: ISODateTime;
@@ -501,8 +502,13 @@ export interface Task extends LinkedEntityIds {
   priority: TaskPriority;
   activity_id?: UUID | null;
   owner_id: UUID;
+  owner_name?: string | null;
   assigned_to?: UUID;
   assigned_to_name?: string | null;
+  lead_name?: string | null;
+  contact_name?: string | null;
+  deal_name?: string | null;
+  account_name?: string | null;
   due_at?: ISODateTime | null;
   completed_at?: ISODateTime | null;
   snoozed_until?: ISODateTime | null;

@@ -68,7 +68,7 @@ export function UsersSettingsClient() {
     () => [
       {
         cell: (user) => (
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-[180px] flex-wrap items-center gap-2">
             <span className="font-semibold text-[#0F2444]">{user.full_name}</span>
             {user.id === currentUserId ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#2563EB]">
@@ -93,7 +93,7 @@ export function UsersSettingsClient() {
 
           const isCurrentUser = user.id === currentUserId;
           return (
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-[220px] flex-wrap items-center gap-2">
               <Button onClick={() => openEditForm(user)} size="sm" type="button" variant="outline">
                 <Edit className="h-4 w-4" aria-hidden="true" />
                 Edit

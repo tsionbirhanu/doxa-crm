@@ -95,6 +95,7 @@ async def list_accounts(
     page_size: int = 20,
     tier: AccountTier | None = None,
     owner_id: UUID | None = None,
+    search: str | None = None,
 ) -> list[AccountResponse]:
     offset, limit = _pagination(page, page_size)
 
@@ -108,6 +109,9 @@ async def list_accounts(
 
     if owner_id:
         query = query.where(Account.owner_id == owner_id)
+
+    if search and search.strip():
+        query = query.where(Account.name.ilike(f"%{search.strip()}%"))
 
     query = query.order_by(Account.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(query)

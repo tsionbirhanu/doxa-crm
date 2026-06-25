@@ -9,11 +9,13 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import (
+    Campaign,
     CampaignEnrollment,
     CampaignEnrollmentStatus,
     CampaignMetric,
     CampaignMetricEventType,
     CampaignSequenceStep,
+    CampaignStatus,
     Contact,
 )
 from app.utils.email import send_email
@@ -49,6 +51,14 @@ async def _process_campaign_step(enrollment_id: UUID) -> dict[str, Any]:
 
         if enrollment.status != CampaignEnrollmentStatus.active:
             return {"status": "skipped", "reason": enrollment.status.value}
+
+        campaign_result = await db.execute(select(Campaign).where(Campaign.id == enrollment.campaign_id))
+        campaign = campaign_result.scalar_one_or_none()
+        if campaign is None:
+            return {"status": "missing_campaign"}
+
+        if campaign.status != CampaignStatus.active:
+            return {"status": "skipped", "reason": campaign.status.value}
 
         contact_result = await db.execute(select(Contact).where(Contact.id == enrollment.contact_id))
         contact = contact_result.scalar_one_or_none()
@@ -130,6 +140,11 @@ def enroll_contact_in_campaign(self, campaign_id: str, contact_id: str) -> dict[
 
 async def _enroll_contact_in_campaign(campaign_id: UUID, contact_id: UUID) -> dict[str, Any]:
     async with AsyncSessionLocal() as db:
+        campaign_result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+        campaign = campaign_result.scalar_one_or_none()
+        if campaign is None:
+            return {"status": "missing_campaign"}
+
         existing_result = await db.execute(
             select(CampaignEnrollment).where(
                 CampaignEnrollment.campaign_id == campaign_id,
@@ -146,7 +161,8 @@ async def _enroll_contact_in_campaign(campaign_id: UUID, contact_id: UUID) -> di
             enrollment.step_index = 0
 
         await db.commit()
-        process_campaign_step.apply_async(args=[str(enrollment.id)], countdown=0)
+        if campaign.status == CampaignStatus.active:
+            process_campaign_step.apply_async(args=[str(enrollment.id)], countdown=0)
         return {"status": "enrolled", "enrollment_id": str(enrollment.id)}
 
 

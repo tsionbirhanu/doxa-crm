@@ -133,6 +133,58 @@ def _model_rows(rows: Iterable[Any]) -> tuple[list[str], list[list[Any]]]:
     raise TypeError("Unsupported report row type")
 
 
+EXPORT_COLUMN_LABELS = {
+    "activity_type": "Activity Type",
+    "assignee_name": "Assignee",
+    "avg_days": "Avg Days",
+    "avg_hours": "Avg Hours",
+    "campaign_name": "Campaign",
+    "completed_at": "Completed At",
+    "converted_leads": "Converted Leads",
+    "conversion_rate": "Conversion Rate",
+    "count": "Count",
+    "due_at": "Due Date",
+    "expected_close": "Expected Close",
+    "group": "Group",
+    "health": "Health",
+    "month": "Month",
+    "open_value": "Open Value",
+    "owner_name": "Owner",
+    "probability": "Probability",
+    "project_name": "Project",
+    "qualification_rate": "Qualification Rate",
+    "qualified_leads": "Qualified Leads",
+    "quota": "Quota",
+    "rep_name": "Rep",
+    "stage": "Stage",
+    "status": "Status",
+    "title": "Title",
+    "total_leads": "Total Leads",
+    "total_value": "Total Value",
+    "value": "Value",
+    "weighted_value": "Weighted Value",
+    "win_rate": "Win Rate",
+    "won_deals": "Won Deals",
+    "won_value": "Won Value",
+}
+
+
+def _export_column_label(column: str) -> str:
+    return EXPORT_COLUMN_LABELS.get(column, column.replace("_", " ").title())
+
+
+def _export_model_rows(rows: Iterable[Any], *, exclude: set[str] | None = None) -> tuple[list[str], list[list[Any]]]:
+    columns, values = _model_rows(rows)
+    if not columns:
+        return columns, values
+
+    excluded = exclude or set()
+    included_indexes = [index for index, column in enumerate(columns) if column not in excluded]
+    export_columns = [_export_column_label(columns[index]) for index in included_indexes]
+    export_values = [[row[index] for index in included_indexes] for row in values]
+    return export_columns, export_values
+
+
 async def _snapshot_data(db: AsyncSession, report_type: str) -> dict | None:
     result = await db.execute(
         select(snapshots.c.data)
@@ -249,7 +301,15 @@ async def deal_velocity(
     ]
 
 
-async def win_loss(db: AsyncSession, *, group_by: str = "owner") -> list[WinLossRow]:
+async def win_loss(
+    db: AsyncSession,
+    *,
+    group_by: str = "owner",
+    pipeline_id: UUID | None = None,
+    owner_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[WinLossRow]:
     group_columns = {
         "owner": (users.c.full_name, deals.join(users, users.c.id == deals.c.owner_id)),
         "source": (leads.c.source, deals.outerjoin(leads, leads.c.assigned_to == deals.c.owner_id)),
@@ -271,6 +331,13 @@ async def win_loss(db: AsyncSession, *, group_by: str = "owner") -> list[WinLoss
         .group_by(group_column, deals.c.status)
         .order_by(group_column.asc().nullslast(), deals.c.status.asc())
     )
+    if pipeline_id:
+        query = query.where(deals.c.pipeline_id == pipeline_id)
+    if owner_id:
+        query = query.where(deals.c.owner_id == owner_id)
+    for condition in _date_filter(deals.c.closed_at, date_from, date_to):
+        query = query.where(condition)
+
     result = await db.execute(query)
     return [
         WinLossRow(
@@ -283,9 +350,17 @@ async def win_loss(db: AsyncSession, *, group_by: str = "owner") -> list[WinLoss
     ]
 
 
-async def forecast(db: AsyncSession) -> list[ForecastMonthRow]:
+async def forecast(
+    db: AsyncSession,
+    *,
+    pipeline_id: UUID | None = None,
+    owner_id: UUID | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[ForecastMonthRow]:
     today = date.today()
-    end = today + timedelta(days=183)
+    start = date_from or today
+    end = date_to or today + timedelta(days=183)
     month_expr = func.to_char(func.date_trunc("month", deals.c.expected_close), "YYYY-MM")
     weighted_expr = deals.c.value * deals.c.probability / 100
     query = (
@@ -298,12 +373,17 @@ async def forecast(db: AsyncSession) -> list[ForecastMonthRow]:
         .where(
             deals.c.is_active.is_(True),
             deals.c.status == DealStatus.open,
-            deals.c.expected_close >= today,
+            deals.c.expected_close >= start,
             deals.c.expected_close <= end,
         )
         .group_by(month_expr)
         .order_by(month_expr.asc())
     )
+    if pipeline_id:
+        query = query.where(deals.c.pipeline_id == pipeline_id)
+    if owner_id:
+        query = query.where(deals.c.owner_id == owner_id)
+
     result = await db.execute(query)
     return [
         ForecastMonthRow(
@@ -819,8 +899,35 @@ async def report_rows_for_export(
 ) -> tuple[list[str], list[list[Any]]]:
     report_name = report.replace("_", "-")
     if report_name == "pipeline-summary":
-        return _model_rows(
+        return _export_model_rows(
             await pipeline_summary(
+                db,
+                pipeline_id=params.get("pipeline_id"),
+                owner_id=params.get("owner_id"),
+                date_from=params.get("date_from"),
+                date_to=params.get("date_to"),
+            ),
+            exclude={"stage_id"},
+        )
+    if report_name == "deal-velocity":
+        return _export_model_rows(
+            await deal_velocity(db, pipeline_id=params.get("pipeline_id"), date_from=params.get("date_from"), date_to=params.get("date_to")),
+            exclude={"stage_id"},
+        )
+    if report_name == "win-loss":
+        return _export_model_rows(
+            await win_loss(
+                db,
+                group_by=params.get("group_by") or "owner",
+                pipeline_id=params.get("pipeline_id"),
+                owner_id=params.get("owner_id"),
+                date_from=params.get("date_from"),
+                date_to=params.get("date_to"),
+            )
+        )
+    if report_name == "forecast":
+        return _export_model_rows(
+            await forecast(
                 db,
                 pipeline_id=params.get("pipeline_id"),
                 owner_id=params.get("owner_id"),
@@ -828,30 +935,24 @@ async def report_rows_for_export(
                 date_to=params.get("date_to"),
             )
         )
-    if report_name == "deal-velocity":
-        return _model_rows(await deal_velocity(db, pipeline_id=params.get("pipeline_id"), date_from=params.get("date_from"), date_to=params.get("date_to")))
-    if report_name == "win-loss":
-        return _model_rows(await win_loss(db, group_by=params.get("group_by") or "owner"))
-    if report_name == "forecast":
-        return _model_rows(await forecast(db))
     if report_name == "quota":
-        return _model_rows(await quota(db, date_from=params.get("date_from"), date_to=params.get("date_to")))
+        return _export_model_rows(await quota(db, date_from=params.get("date_from"), date_to=params.get("date_to")), exclude={"user_id"})
     if report_name == "lead-volume":
-        return _model_rows(await lead_volume(db, date_from=params.get("date_from"), date_to=params.get("date_to"), group_by=params.get("group_by") or "source"))
+        return _export_model_rows(await lead_volume(db, date_from=params.get("date_from"), date_to=params.get("date_to"), group_by=params.get("group_by") or "source"))
     if report_name == "lead-funnel":
-        return _model_rows([await lead_funnel(db)])
+        return _export_model_rows([await lead_funnel(db)])
     if report_name == "lead-response-time":
-        return _model_rows(await lead_response_time(db))
+        return _export_model_rows(await lead_response_time(db), exclude={"rep_id"})
     if report_name == "activity-volume":
-        return _model_rows(await activity_volume(db, date_from=params.get("date_from"), date_to=params.get("date_to")))
+        return _export_model_rows(await activity_volume(db, date_from=params.get("date_from"), date_to=params.get("date_to")), exclude={"rep_id"})
     if report_name == "overdue-tasks":
-        return _model_rows(await overdue_tasks(db))
+        return _export_model_rows(await overdue_tasks(db), exclude={"id", "owner_id"})
     if report_name == "sequence-performance":
-        return _model_rows(await sequence_performance(db))
+        return _export_model_rows(await sequence_performance(db), exclude={"campaign_id"})
     if report_name == "customer-health":
-        return _model_rows(await customer_health(db))
+        return _export_model_rows(await customer_health(db), exclude={"project_id"})
     if report_name == "renewal-pipeline":
-        return _model_rows(await renewal_pipeline(db))
+        return _export_model_rows(await renewal_pipeline(db), exclude={"deal_id"})
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
 
 

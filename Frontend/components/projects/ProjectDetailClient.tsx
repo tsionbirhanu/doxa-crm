@@ -15,6 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useMemo, useRef, useState } from "react";
 
 import { HealthPill } from "@/components/projects/HealthPill";
@@ -86,9 +87,11 @@ function milestoneStats(milestones: Milestone[]) {
 
 export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { canWriteProjects } = usePermissions();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const [copied, setCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
   const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
@@ -189,6 +192,14 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
       void queryClient.invalidateQueries({ queryKey: ["projects", "documents", projectId] });
     },
   });
+  const deleteProject = useMutation({
+    mutationFn: () => api.delete<void>(`/projects/${projectId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      router.push("/projects");
+    },
+  });
 
   function handleAddMilestone(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -266,7 +277,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-xl bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
@@ -284,10 +295,16 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
               {copied ? "Copied" : "Copy Portal Link"}
             </Button>
             {canWriteProjects ? (
-              <Button onClick={() => setEditOpen(true)} type="button">
-                <Edit className="h-4 w-4" aria-hidden="true" />
-                Edit
-              </Button>
+              <>
+                <Button onClick={() => setEditOpen(true)} type="button">
+                  <Edit className="h-4 w-4" aria-hidden="true" />
+                  Edit
+                </Button>
+                <Button onClick={() => setConfirmDeleteProject(true)} type="button" variant="destructive">
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Delete Project
+                </Button>
+              </>
             ) : null}
           </div>
         </div>
@@ -306,7 +323,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <section className="rounded-xl bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#0F2444]">Milestones</h2>
@@ -332,7 +349,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
               const completed = Boolean(milestone.completed_at);
 
               return (
-                <div className="flex items-start gap-4 rounded-lg border border-slate-100 p-4" key={milestone.id}>
+                <div className="flex items-start gap-4 rounded-lg border border-slate-100 bg-white p-4 shadow-[0_1px_0_rgba(15,36,68,0.03)]" key={milestone.id}>
                   <button
                     aria-label={completed ? "Milestone completed" : "Complete milestone"}
                     className={cn(
@@ -403,7 +420,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
         </section>
 
         <aside className="grid gap-4 content-start">
-          <section className="rounded-xl bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-[#0F2444]">Documents</h2>
               {canWriteProjects ? (
@@ -475,7 +492,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
             </div>
           </section>
 
-          <section className="rounded-xl bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-[#0F2444]">Project Info</h2>
             <dl className="mt-4 grid gap-3 text-sm">
               {project.deal_id ? (
@@ -500,7 +517,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
               </div>
               <div>
                 <dt className="text-[#64748B]">Owner</dt>
-                <dd className="mt-1 font-semibold text-[#0F2444]">{project.owner_name ?? project.owner_id.slice(0, 8)}</dd>
+                <dd className="mt-1 font-semibold text-[#0F2444]">{project.owner_name ?? "Unassigned"}</dd>
               </div>
               <div>
                 <dt className="text-[#64748B]">Portal Token</dt>
@@ -537,6 +554,15 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
             }}
             open={Boolean(milestoneToDelete)}
             title="Delete milestone"
+          />
+          <ConfirmDialog
+            confirmLabel="Delete"
+            description="Delete this project from active project lists. This keeps the existing audit trail in the system."
+            isPending={deleteProject.isPending}
+            onConfirm={() => deleteProject.mutate()}
+            onOpenChange={setConfirmDeleteProject}
+            open={confirmDeleteProject}
+            title="Delete project"
           />
           <ConfirmDialog
             confirmLabel="Confirm"

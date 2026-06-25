@@ -20,6 +20,22 @@ const betterAuthSecret =
   envValue("BETTER_AUTH_SECRET", process.env.SECRET_KEY && process.env.SECRET_KEY.trim().length > 0 ? process.env.SECRET_KEY : fallbackSecret);
 
 const jwtSecret = new TextEncoder().encode(betterAuthSecret);
+const defaultAuthPoolMax = 2;
+
+declare global {
+  var doxaAuthDatabasePool: Pool | undefined;
+}
+
+function authPoolMax(): number {
+  const rawValue = process.env.BETTER_AUTH_DB_POOL_MAX;
+  const parsedValue = rawValue ? Number(rawValue) : defaultAuthPoolMax;
+
+  if (!Number.isFinite(parsedValue)) {
+    return defaultAuthPoolMax;
+  }
+
+  return Math.min(Math.max(Math.trunc(parsedValue), 1), 10);
+}
 
 function normalizePgConnectionString(connectionString: string): string {
   try {
@@ -42,11 +58,19 @@ function shouldUseSsl(connectionString: string): boolean {
   }
 }
 
-const database = new Pool({
-  allowExitOnIdle: true,
-  connectionString: normalizePgConnectionString(databaseUrl),
-  ssl: shouldUseSsl(databaseUrl) ? { rejectUnauthorized: false } : undefined,
-});
+function createAuthDatabasePool(): Pool {
+  return new Pool({
+    allowExitOnIdle: true,
+    connectionString: normalizePgConnectionString(databaseUrl),
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 10000,
+    max: authPoolMax(),
+    ssl: shouldUseSsl(databaseUrl) ? { rejectUnauthorized: false } : undefined,
+  });
+}
+
+const database = globalThis.doxaAuthDatabasePool ?? createAuthDatabasePool();
+globalThis.doxaAuthDatabasePool = database;
 
 function stringField(source: object, key: string): string | undefined {
   const value = (source as Record<string, unknown>)[key];

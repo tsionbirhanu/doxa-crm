@@ -170,7 +170,7 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
       { cell: (lead) => sourcePill(lead.source), header: "Source", id: "source" },
       { cell: (lead) => <LeadScoreBar score={lead.score} />, header: "Score", id: "score" },
       { cell: (lead) => <StatusPill status={lead.status} type="lead" />, header: "Status", id: "status" },
-      { cell: (lead) => lead.assigned_to_name ?? lead.assigned_to.slice(0, 8), header: "Assigned To", id: "assigned" },
+      { cell: (lead) => lead.assigned_to_name ?? "Unassigned", header: "Assigned To", id: "assigned" },
       { cell: (lead) => formatDate(lead.created_at), header: "Created", id: "created" },
       ...(canWriteLeads
         ? [
@@ -199,7 +199,7 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
     <div className="grid gap-6">
       <PageHeader
         primaryAction={canWriteLeads ? { icon: Plus, label: "New Lead", onClick: () => setFormOpen(true) } : undefined}
-        subtitle="Capture, score, assign, import, deduplicate, and convert leads."
+        subtitle="Review incoming leads, ownership, and conversion readiness."
         title="Leads"
       />
 
@@ -221,7 +221,7 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm hover:bg-amber-100"
           href="/leads?view=duplicates"
         >
-          {duplicateCount} potential duplicate leads found — Review
+          {duplicateCount} potential duplicate leads found - Review duplicates
         </Link>
       ) : null}
 
@@ -231,62 +231,72 @@ export function LeadsPageClient({ view }: LeadsPageClientProps) {
         <>
           <section className="rounded-xl bg-white p-4 shadow-sm">
             <div className="grid gap-3 lg:grid-cols-[minmax(150px,1fr)_minmax(150px,1fr)_minmax(180px,1fr)_minmax(120px,0.7fr)_minmax(120px,0.7fr)]">
-              <select
-                className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
-                onChange={(event) => updateFilter("status", event.target.value)}
-                value={filters.status}
-              >
-                <option value="">All statuses</option>
-                {leadStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {optionLabel(status)}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
-                onChange={(event) => updateFilter("source", event.target.value)}
-                value={filters.source}
-              >
-                <option value="">All sources</option>
-                {leadSources.map((source) => (
-                  <option key={source} value={source}>
-                    {optionLabel(source)}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
-                onChange={(event) => updateFilter("assigned_to", event.target.value)}
-                value={filters.assigned_to}
-              >
-                <option value="">All assignees</option>
-                {(usersQuery.data ?? []).map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name}
-                  </option>
-                ))}
-              </select>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" aria-hidden="true" />
+              <div>
+                <select
+                  className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+                  onChange={(event) => updateFilter("status", event.target.value)}
+                  value={filters.status}
+                >
+                  <option value="">All statuses</option>
+                  {leadStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {optionLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <select
+                  className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+                  onChange={(event) => updateFilter("source", event.target.value)}
+                  value={filters.source}
+                >
+                  <option value="">All sources</option>
+                  {leadSources.map((source) => (
+                    <option key={source} value={source}>
+                      {optionLabel(source)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <select
+                  className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+                  onChange={(event) => updateFilter("assigned_to", event.target.value)}
+                  value={filters.assigned_to}
+                >
+                  <option value="">All assignees</option>
+                  {(usersQuery.data ?? []).map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" aria-hidden="true" />
+                  <Input
+                    className="pl-9"
+                    max={100}
+                    min={0}
+                    onChange={(event) => updateFilter("min_score", event.target.value)}
+                    placeholder="0"
+                    type="number"
+                    value={filters.min_score}
+                  />
+                </div>
+              </div>
+              <div>
                 <Input
-                  className="pl-9"
                   max={100}
                   min={0}
-                  onChange={(event) => updateFilter("min_score", event.target.value)}
-                  placeholder="Min score"
+                  onChange={(event) => updateFilter("max_score", event.target.value)}
+                  placeholder="100"
                   type="number"
-                  value={filters.min_score}
+                  value={filters.max_score}
                 />
               </div>
-              <Input
-                max={100}
-                min={0}
-                onChange={(event) => updateFilter("max_score", event.target.value)}
-                placeholder="Max score"
-                type="number"
-                value={filters.max_score}
-              />
             </div>
           </section>
 

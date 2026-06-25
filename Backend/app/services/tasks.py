@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Task, TaskStatus, User
+from app.models import Account, Contact, Deal, Lead, Task, TaskStatus, User
 from app.schemas.activities import TaskCreate, TaskResponse, TaskSnoozeRequest, TaskUpdate
 
 
@@ -25,6 +25,45 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _contact_name(first_name: str | None, last_name: str | None) -> str | None:
+    name = " ".join(part for part in (first_name, last_name) if part)
+    return name or None
+
+
+def _task_select_with_names():
+    return (
+        select(
+            Task,
+            User.full_name.label("owner_name"),
+            Contact.first_name.label("contact_first_name"),
+            Contact.last_name.label("contact_last_name"),
+            Deal.title.label("deal_name"),
+            Lead.full_name.label("lead_name"),
+            Account.name.label("account_name"),
+        )
+        .select_from(Task)
+        .outerjoin(User, User.id == Task.owner_id)
+        .outerjoin(Contact, Contact.id == Task.contact_id)
+        .outerjoin(Deal, Deal.id == Task.deal_id)
+        .outerjoin(Lead, Lead.id == Task.lead_id)
+        .outerjoin(Account, Account.id == Task.account_id)
+    )
+
+
+def _task_response_with_names(row) -> TaskResponse:
+    task, owner_name, contact_first_name, contact_last_name, deal_name, lead_name, account_name = row
+    return TaskResponse.model_validate(task).model_copy(
+        update={
+            "account_name": account_name,
+            "assigned_to_name": owner_name,
+            "contact_name": _contact_name(contact_first_name, contact_last_name),
+            "deal_name": deal_name,
+            "lead_name": lead_name,
+            "owner_name": owner_name,
+        }
+    )
+
+
 async def list_tasks(
     db: AsyncSession,
     *,
@@ -39,7 +78,7 @@ async def list_tasks(
     account_id: UUID | None = None,
 ) -> list[TaskResponse]:
     offset, limit = _pagination(page, page_size)
-    query = select(Task)
+    query = _task_select_with_names()
 
     if status_filter:
         query = query.where(Task.status == status_filter)
@@ -57,7 +96,7 @@ async def list_tasks(
         query = query.where(Task.account_id == account_id)
 
     result = await db.execute(query.order_by(Task.due_at.asc().nulls_last()).offset(offset).limit(limit))
-    return [TaskResponse.model_validate(task) for task in result.scalars().all()]
+    return [_task_response_with_names(row) for row in result.all()]
 
 
 async def list_overdue_tasks(
@@ -68,11 +107,11 @@ async def list_overdue_tasks(
     owner_id: UUID | None = None,
 ) -> list[TaskResponse]:
     offset, limit = _pagination(page, page_size)
-    query = _apply_overdue_filter(select(Task))
+    query = _apply_overdue_filter(_task_select_with_names())
     if owner_id:
         query = query.where(Task.owner_id == owner_id)
     result = await db.execute(query.order_by(Task.due_at.asc()).offset(offset).limit(limit))
-    return [TaskResponse.model_validate(task) for task in result.scalars().all()]
+    return [_task_response_with_names(row) for row in result.all()]
 
 
 def _apply_overdue_filter(query):

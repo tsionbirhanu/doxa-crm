@@ -176,12 +176,12 @@ export function SalesTab() {
     queryKey: ["reports", "pipeline-summary", filters, pipelineId],
   });
   const winLossQuery = useQuery({
-    queryFn: () => api.get<WinLossRow[]>("/reports/win-loss", { group_by: "owner" }),
-    queryKey: ["reports", "win-loss", "owner"],
+    queryFn: () => api.get<WinLossRow[]>("/reports/win-loss", { ...exportParams(filters, pipelineId), group_by: "owner" }),
+    queryKey: ["reports", "win-loss", "owner", filters, pipelineId],
   });
   const forecastQuery = useQuery({
-    queryFn: () => api.get<ForecastMonthRow[]>("/reports/forecast"),
-    queryKey: ["reports", "forecast"],
+    queryFn: () => api.get<ForecastMonthRow[]>("/reports/forecast", exportParams(filters, pipelineId)),
+    queryKey: ["reports", "forecast", filters, pipelineId],
   });
   const velocityQuery = useQuery({
     queryFn: () =>
@@ -215,10 +215,10 @@ export function SalesTab() {
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-xl bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-slate-200/70 bg-white p-4 shadow-sm">
         <div className="mb-3">
           <select
-            className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950 md:max-w-sm"
+            className="h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950 shadow-sm md:max-w-sm"
             onChange={(event) => setPipelineId(event.target.value)}
             value={pipelineId}
           >
@@ -269,7 +269,7 @@ export function SalesTab() {
       </ReportCard>
 
       <ReportCard
-        actions={<ExportButtons report="win-loss" />}
+        actions={<ExportButtons params={{ ...exportParams(filters, pipelineId), group_by: "owner" }} report="win-loss" />}
         description="Closed-won vs closed-lost deals by count and value."
         empty={winLossRows.length === 0}
         error={winLossQuery.isError}
@@ -337,8 +337,8 @@ export function SalesTab() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <ReportCard
-          actions={<ExportButtons report="forecast" />}
-          description="Weighted monthly forecast for the next six months."
+          actions={<ExportButtons params={exportParams(filters, pipelineId)} report="forecast" />}
+          description="Weighted monthly forecast for the selected expected-close range."
           empty={forecast.length === 0}
           error={forecastQuery.isError}
           isFetching={forecastQuery.isFetching}

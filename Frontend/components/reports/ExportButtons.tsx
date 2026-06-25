@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { downloadReport, type ExportParams } from "@/lib/report-export";
+import { cn } from "@/lib/utils";
 
 interface ExportButtonsProps {
   params?: ExportParams;
@@ -24,19 +25,21 @@ export function ExportButtons({ params = {}, report }: ExportButtonsProps) {
   }
 
   return (
-    <>
-      <Button disabled={exporting !== null} onClick={() => void runExport("csv")} size="sm" type="button" variant="outline">
-        <Download className="h-4 w-4" aria-hidden="true" />
-        {exporting === "csv" ? "Exporting" : "Export CSV"}
-      </Button>
-      <Button disabled={exporting !== null} onClick={() => void runExport("pdf")} size="sm" type="button" variant="outline">
-        <Download className="h-4 w-4" aria-hidden="true" />
-        {exporting === "pdf" ? "Exporting" : "Export PDF"}
-      </Button>
-      <Button disabled={exporting !== null} onClick={() => void runExport("xlsx")} size="sm" type="button" variant="outline">
-        <Download className="h-4 w-4" aria-hidden="true" />
-        {exporting === "xlsx" ? "Exporting" : "Export XLSX"}
-      </Button>
-    </>
+    <div className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+      {(["csv", "pdf", "xlsx"] as const).map((format) => (
+        <Button
+          className={cn("h-7 rounded px-2.5 text-xs text-[#475569] hover:bg-slate-50", exporting === format && "text-[#0F2444]")}
+          disabled={exporting !== null}
+          key={format}
+          onClick={() => void runExport(format)}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <Download className={cn("h-3.5 w-3.5", exporting === format && "animate-pulse")} aria-hidden="true" />
+          {exporting === format ? "Exporting" : format.toUpperCase()}
+        </Button>
+      ))}
+    </div>
   );
 }

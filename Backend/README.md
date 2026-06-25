@@ -77,8 +77,10 @@ Required variables:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://...
+DB_POOL_SIZE=1
+DB_MAX_OVERFLOW=1
 REDIS_URL=redis://redis:6379/0
-SECRET_KEY=change-me
+SECRET_KEY=change-me-to-a-random-32-byte-or-longer-secret-key
 ENVIRONMENT=development
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-supabase-api-key
@@ -104,11 +106,32 @@ MEILISEARCH_URL=http://localhost:7700
 
 `SECRET_KEY` must match the frontend `BETTER_AUTH_SECRET`.
 
+For Supabase session-pool development, keep the backend pool small:
+
+```env
+DB_POOL_SIZE=1
+DB_MAX_OVERFLOW=1
+```
+
 For Supabase:
 
 - Backend uses `postgresql+asyncpg://...`
 - If direct connection fails because of IPv6, use the Supabase Session Pooler URL
 - Include URL-encoded special characters in the password, for example `%25` for `%`
+
+Optional integrations:
+
+```env
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=crm@example.com
+R2_ENDPOINT_URL=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_REGION_NAME=auto
+```
+
+Use Resend for email delivery and R2-compatible storage for project documents when those features need real external services.
 
 ## Run Everything With Docker
 
