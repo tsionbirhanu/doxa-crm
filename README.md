@@ -143,7 +143,7 @@ readonly@doxa.local           read_only
 - `/contacts`
 - `/accounts`
 - `/deals`
-- `/pipeline` redirects to `/deals`
+- `/deals`
 - `/activities`
 - `/tasks`
 - `/campaigns`
