@@ -12,10 +12,12 @@ Doxa-CRM/
 
 ## Stack
 
-- Frontend: Next.js 15, React 19, TypeScript, Tailwind CSS, BetterAuth, TanStack Query, Recharts
-- Backend: FastAPI, SQLAlchemy async ORM, Alembic, PostgreSQL or Supabase Postgres
+- Frontend: Next.js 15, TypeScript, Tailwind CSS v4, BetterAuth, TanStack Query v5, Zustand, Recharts, React Hook Form, Zod, Lucide React, @hello-pangea/dnd
+- Backend: FastAPI, SQLAlchemy async ORM, Alembic, Pydantic Settings, PostgreSQL or Supabase Postgres
 - Background services: Redis, Celery worker, Celery Beat, Meilisearch
+- Auth: BetterAuth on Next.js with JWT validation in FastAPI
 - Local orchestration: Docker Compose from `Backend/docker-compose.yml`
+- Testing: TypeScript typecheck, Pytest, pytest-asyncio, pytest-cov
 
 ## Local URLs
 
@@ -143,7 +145,7 @@ readonly@doxa.local           read_only
 - `/contacts`
 - `/accounts`
 - `/deals`
-- `/pipeline` redirects to `/deals`
+- `/deals`
 - `/activities`
 - `/tasks`
 - `/campaigns`
@@ -155,9 +157,9 @@ readonly@doxa.local           read_only
 
 Backend API routes are mounted under `/api/v1`.
 
-## Product Design Answers
+## CRM Design Overview
 
-This section answers the main CRM design questions from the project brief and reflects the current implementation.
+This section answers the main CRM design questions and reflects the current implementation.
 
 ### Lead Management
 
