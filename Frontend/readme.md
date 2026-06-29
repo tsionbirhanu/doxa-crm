@@ -5,7 +5,6 @@ Next.js frontend for Doxa CRM. It provides the authenticated CRM workspace, Bett
 ## Tech Stack
 
 - Next.js 15 App Router
-- React 19
 - TypeScript strict mode
 - Tailwind CSS v4
 - BetterAuth

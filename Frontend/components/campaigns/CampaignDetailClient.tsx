@@ -22,6 +22,9 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type {
   Campaign,
   CampaignEnrollment,
+  CampaignMetric,
+  CampaignMetricCreate,
+  CampaignMetricEventType,
   CampaignMetrics,
   CampaignSequenceStep,
   CampaignStepsReorderRequest,
@@ -33,6 +36,14 @@ type CampaignTab = "overview" | "sequence" | "enrollments" | "metrics";
 interface CampaignDetailClientProps {
   campaignId: string;
 }
+
+const metricEvents: Array<{ eventType: CampaignMetricEventType; label: string }> = [
+  { eventType: "sent", label: "Sent" },
+  { eventType: "opened", label: "Opened" },
+  { eventType: "clicked", label: "Clicked" },
+  { eventType: "replied", label: "Replied" },
+  { eventType: "converted", label: "Converted" },
+];
 
 function optionLabel(value: string): string {
   return value
@@ -85,6 +96,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const [editingStep, setEditingStep] = useState<CampaignSequenceStep | null>(null);
   const [contactSelectOpen, setContactSelectOpen] = useState(false);
   const [deleteCampaignOpen, setDeleteCampaignOpen] = useState(false);
+  const [metricContactId, setMetricContactId] = useState("");
+  const [metricStepId, setMetricStepId] = useState("");
 
   const campaignQuery = useQuery({
     queryFn: () => api.get<Campaign>(`/campaigns/${campaignId}`),
@@ -173,6 +186,24 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const disabledActivationReason = !hasSteps ? "Add at least one sequence step before activating." : !hasActiveEnrollments ? "Enroll active contacts before activating." : "";
   const sortedSteps = [...steps].sort((left, right) => left.step_index - right.step_index);
   const variantComparison = useMemo(() => variantRows(steps), [steps]);
+  const metricContactOptions = enrollments.filter((enrollment) => enrollment.status !== "unsubscribed");
+  const metricContactIds = new Set(metricContactOptions.map((enrollment) => enrollment.contact_id));
+  const activeMetricContactId = metricContactIds.has(metricContactId) ? metricContactId : metricContactOptions[0]?.contact_id ?? "";
+  const metricStepIds = new Set(sortedSteps.map((step) => step.id));
+  const activeMetricStepId = metricStepIds.has(metricStepId) ? metricStepId : "";
+  const recordMetric = useMutation({
+    mutationFn: (eventType: CampaignMetricEventType) =>
+      api.post<CampaignMetric, CampaignMetricCreate>(`/campaigns/${campaignId}/metrics`, {
+        contact_id: activeMetricContactId,
+        event_type: eventType,
+        step_id: activeMetricStepId || null,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "detail", campaignId] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns", "metrics", campaignId] });
+    },
+  });
 
   function onDragEnd(result: DropResult) {
     if (!canWriteCampaigns) {
@@ -470,6 +501,63 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       {tab === "metrics" ? (
         <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-[#0F2444]">Delivery Metrics</h2>
+          {canWriteCampaigns ? (
+            <div className="mt-5 grid gap-3 rounded-xl border border-slate-200 p-4 lg:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto] lg:items-end">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-normal text-[#64748B]" htmlFor="metric_contact">
+                  Contact
+                </label>
+                <select
+                  className="mt-1 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+                  disabled={metricContactOptions.length === 0 || recordMetric.isPending}
+                  id="metric_contact"
+                  onChange={(event) => setMetricContactId(event.target.value)}
+                  value={activeMetricContactId}
+                >
+                  {metricContactOptions.length === 0 ? <option value="">No enrolled contacts</option> : null}
+                  {metricContactOptions.map((enrollment) => (
+                    <option key={enrollment.id} value={enrollment.contact_id}>
+                      {enrollment.contact_name ?? enrollment.contact_email ?? "Contact"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-normal text-[#64748B]" htmlFor="metric_step">
+                  Step
+                </label>
+                <select
+                  className="mt-1 h-10 w-full rounded-md border border-[var(--input)] bg-white px-3 text-sm text-slate-950"
+                  disabled={recordMetric.isPending}
+                  id="metric_step"
+                  onChange={(event) => setMetricStepId(event.target.value)}
+                  value={activeMetricStepId}
+                >
+                  <option value="">Campaign level</option>
+                  {sortedSteps.map((step, index) => (
+                    <option key={step.id} value={step.id}>
+                      Step {index + 1}: {step.subject}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {metricEvents.map((event) => (
+                  <Button
+                    disabled={!activeMetricContactId || recordMetric.isPending}
+                    key={event.eventType}
+                    onClick={() => recordMetric.mutate(event.eventType)}
+                    size="sm"
+                    type="button"
+                    variant={event.eventType === "sent" ? "outline" : "default"}
+                  >
+                    {event.label}
+                  </Button>
+                ))}
+              </div>
+              {recordMetric.isError ? <div className="text-sm text-red-700 lg:col-span-3">Could not record metric.</div> : null}
+            </div>
+          ) : null}
           {!hasMetrics ? (
             <div className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-[#64748B]">No data yet</div>
           ) : (

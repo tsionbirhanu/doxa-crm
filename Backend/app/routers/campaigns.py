@@ -13,6 +13,8 @@ from app.schemas.campaigns import (
     CampaignCreate,
     CampaignEnrollmentResponse,
     CampaignEnrollRequest,
+    CampaignMetricCreate,
+    CampaignMetricResponse,
     CampaignMetricsResponse,
     CampaignResponse,
     CampaignStepCreate,
@@ -140,6 +142,16 @@ async def get_campaign_metrics(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CampaignMetricsResponse:
     return await campaigns_service.get_campaign_metrics(db, campaign_id)
+
+
+@router.post("/{campaign_id}/metrics", response_model=CampaignMetricResponse, status_code=status.HTTP_201_CREATED)
+async def record_campaign_metric(
+    campaign_id: UUID,
+    metric_in: CampaignMetricCreate,
+    current_user: Annotated[User, Depends(require_role(*CAMPAIGN_WRITE_ROLES))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CampaignMetricResponse:
+    return await campaigns_service.record_campaign_metric(db, campaign_id, metric_in)
 
 
 @router.get("/{campaign_id}/steps", response_model=list[CampaignStepResponse])

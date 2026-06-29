@@ -37,6 +37,7 @@ import app.services.campaigns as campaigns_service
 from app.schemas.campaigns import (
     CampaignEnrollmentResponse,
     CampaignEnrollRequest,
+    CampaignMetricResponse,
     CampaignMetricsResponse,
     CampaignResponse,
     CampaignStepResponse,
@@ -157,6 +158,17 @@ def make_step_response(campaign_id: UUID, step_id: UUID | None = None, step_inde
     )
 
 
+def make_metric_response(campaign_id: UUID, contact_id: UUID, step_id: UUID | None = None) -> CampaignMetricResponse:
+    return CampaignMetricResponse(
+        id=uuid4(),
+        campaign_id=campaign_id,
+        contact_id=contact_id,
+        step_id=step_id,
+        event_type=CampaignMetricEventType.opened,
+        created_at=datetime.now(timezone.utc),
+    )
+
+
 @pytest.fixture
 def app():
     test_app = create_app()
@@ -223,6 +235,38 @@ async def test_enroll_contacts_route(app, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()[0]["contact_id"] == str(contact_id)
+
+
+@pytest.mark.asyncio
+async def test_record_campaign_metric_route(app, monkeypatch):
+    campaign_id = uuid4()
+    contact_id = uuid4()
+    step_id = uuid4()
+    metric_response = make_metric_response(campaign_id, contact_id, step_id)
+
+    async def fake_record_campaign_metric(db, campaign_id_arg, metric_in):
+        assert campaign_id_arg == campaign_id
+        assert metric_in.contact_id == contact_id
+        assert metric_in.step_id == step_id
+        assert metric_in.event_type == CampaignMetricEventType.opened
+        return metric_response
+
+    monkeypatch.setattr(campaigns_router_module.campaigns_service, "record_campaign_metric", fake_record_campaign_metric)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            f"/api/v1/campaigns/{campaign_id}/metrics",
+            json={
+                "contact_id": str(contact_id),
+                "step_id": str(step_id),
+                "event_type": "opened",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["event_type"] == "opened"
+    assert response.json()["contact_id"] == str(contact_id)
 
 
 @pytest.mark.asyncio

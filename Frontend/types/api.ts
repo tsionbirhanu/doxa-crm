@@ -446,6 +446,7 @@ export interface DealForecastResponse {
 
 export type ActivityType = "call" | "email" | "meeting" | "note" | "task";
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "overdue";
+export type StoredTaskStatus = Exclude<TaskStatus, "overdue">;
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export interface LinkedEntityIds {
@@ -519,7 +520,8 @@ export interface Task extends LinkedEntityIds {
 export interface TaskCreate extends LinkedEntityIds {
   title: string;
   description?: string | null;
-  status?: TaskStatus;
+  type?: ActivityType;
+  status?: StoredTaskStatus;
   priority?: TaskPriority;
   due_at?: ISODateTime | null;
   activity_id?: UUID | null;
@@ -529,7 +531,8 @@ export interface TaskCreate extends LinkedEntityIds {
 export interface TaskUpdate {
   title?: string;
   description?: string | null;
-  status?: TaskStatus;
+  type?: ActivityType;
+  status?: StoredTaskStatus;
   priority?: TaskPriority;
   due_at?: ISODateTime | null;
   completed_at?: ISODateTime | null;
@@ -655,6 +658,12 @@ export interface CampaignMetric {
   step_id?: UUID | null;
   event_type: CampaignMetricEventType;
   created_at: ISODateTime;
+}
+
+export interface CampaignMetricCreate {
+  contact_id: UUID;
+  event_type: CampaignMetricEventType;
+  step_id?: UUID | null;
 }
 
 export type ProjectHealth = "green" | "yellow" | "red";
@@ -822,6 +831,8 @@ export interface OverdueTaskRow {
   due_at: ISODateTime;
   owner_id: UUID;
   assignee_name?: string | null;
+  linked_to?: string | null;
+  linked_type?: string | null;
 }
 
 export interface SequencePerformanceRow {

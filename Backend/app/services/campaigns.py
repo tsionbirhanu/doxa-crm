@@ -25,6 +25,8 @@ from app.schemas.campaigns import (
     CampaignCreate,
     CampaignEnrollmentResponse,
     CampaignEnrollRequest,
+    CampaignMetricCreate,
+    CampaignMetricResponse,
     CampaignMetricsResponse,
     CampaignResponse,
     CampaignStepCreate,
@@ -347,6 +349,37 @@ async def unsubscribe_contact(
 async def get_campaign_metrics(db: AsyncSession, campaign_id: UUID) -> CampaignMetricsResponse:
     await get_campaign_model(db, campaign_id)
     return await aggregate_campaign_metrics(db, campaign_id)
+
+
+async def record_campaign_metric(
+    db: AsyncSession,
+    campaign_id: UUID,
+    metric_in: CampaignMetricCreate,
+) -> CampaignMetricResponse:
+    await get_campaign_model(db, campaign_id)
+
+    enrollment_result = await db.execute(
+        select(CampaignEnrollment).where(
+            CampaignEnrollment.campaign_id == campaign_id,
+            CampaignEnrollment.contact_id == metric_in.contact_id,
+        )
+    )
+    if enrollment_result.scalar_one_or_none() is None:
+        raise _not_found("Campaign enrollment")
+
+    if metric_in.step_id is not None:
+        await get_step_model(db, campaign_id, metric_in.step_id)
+
+    metric = CampaignMetric(
+        campaign_id=campaign_id,
+        contact_id=metric_in.contact_id,
+        step_id=metric_in.step_id,
+        event_type=metric_in.event_type,
+    )
+    db.add(metric)
+    await db.commit()
+    await db.refresh(metric)
+    return CampaignMetricResponse.model_validate(metric)
 
 
 async def list_steps(db: AsyncSession, campaign_id: UUID) -> list[CampaignStepResponse]:
